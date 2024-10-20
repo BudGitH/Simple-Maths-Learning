@@ -187,6 +187,10 @@
         #close-number-pad-button:hover {
             background-color: #005f73;
         }
+        .operator {
+            font-size: 50px;
+            margin: 0 20px;
+        }
     </style>
 </head>
 <body>
@@ -342,7 +346,7 @@
             // List of fruit emojis to randomize
             const fruitEmojis = ['🍎', '🍌', '🍇', '🍊', '🍉', '🍓', '🍒', '🍍', '🍐', '🍋'];
 
-            // Randomly decide whether the equation is addition or subtraction with a 50% probability
+            // Randomly decide whether the equation is addition or subtraction with a 65% probability
             const isAddition = Math.random() < 0.65;
             const operatorElement = document.querySelector('.operator');
             operatorElement.textContent = isAddition ? '+' : '-';
