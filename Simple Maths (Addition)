@@ -88,9 +88,24 @@
             border-radius: 20px;
             text-align: center;
             position: relative;
+            box-sizing: border-box;
             box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
-            width: 50%;
+            width: 90%;
             max-width: 600px;
+        }
+        @media (max-width: 600px) {
+            #modal-content {
+                padding: 20px;
+            }
+        }
+        .modal-gif {
+            width: 100%;
+            max-width: 300px;
+            height: auto;
+            margin-bottom: 20px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
         }
         #toast-message {
             visibility: hidden;
@@ -295,7 +310,7 @@
 
         function showModal(message) {
             const gifUrl = message.includes('Great job') ? 'https://i.giphy.com/D2hncA3u88gmeCFeoh.webp' : 'https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExdHdyejFxN2ppYWR4MmJ5amczb3Bqc3VmNWZhZG41aGx1OHk5ejAxcyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/dry8S89ncvPMrmgwvr/giphy.webp';
-            modalMessage.innerHTML = `<img src="${gifUrl}" alt="Reaction GIF" style="width: 300px; height: auto; margin-bottom: 20px; display: block; margin-left: auto; margin-right: auto;">`;
+            modalMessage.innerHTML = `<img src="${gifUrl}" alt="Reaction GIF" class="modal-gif">`;
             modalTitle.textContent = message;
             modal.style.display = 'flex';
         }
