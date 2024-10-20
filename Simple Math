@@ -200,7 +200,7 @@
             </div>
             <button id="count1" class="input-box" onclick="openNumberPad(event)">?</button>
         </div>
-        <span class="operator">+</span>
+        <span class="operator"></span>
         <div class="emoji-container">
             <div id="objects-container-2">
                 <span class="emoji">🍍</span>
@@ -216,6 +216,7 @@
     <div id="number-pad-modal" class="modal">
         <div id="number-pad-content">
             <div class="number-pad">
+                <button class="number-button" onclick="handleNumberClick(0)">0</button>
                 <button class="number-button" onclick="handleNumberClick(1)">1</button>
                 <button class="number-button" onclick="handleNumberClick(2)">2</button>
                 <button class="number-button" onclick="handleNumberClick(3)">3</button>
@@ -242,9 +243,12 @@
     <div id="toast-message">New numbers have been generated!</div>
 
     <script>
+        // Wait until DOM content is loaded before running the regenerateEquation function
         document.addEventListener('DOMContentLoaded', () => {
             regenerateEquation();
         });
+
+        // Declaring constants for buttons and other elements
         const validateButton = document.getElementById('validate-button');
         const regenerateButton = document.getElementById('regenerate-button');
         const modal = document.getElementById('modal');
@@ -256,20 +260,27 @@
         const toastMessage = document.getElementById('toast-message');
         let activeInput = null;
 
+        // Adding event listeners for validation and regeneration buttons
         validateButton.addEventListener('click', validateAnswer);
         regenerateButton.addEventListener('click', regenerateEquation);
 
+        // Function to validate the user's answer
         function validateAnswer() {
+            // Get the number of fruit elements in each container
             const correctCount1 = document.getElementById('objects-container').children.length;
             const correctCount2 = document.getElementById('objects-container-2').children.length;
-            const correctAnswer = correctCount1 + correctCount2;
+            const operator = document.querySelector('.operator').textContent;
+            // Calculate the correct answer based on the operator
+            const correctAnswer = operator === '+' ? correctCount1 + correctCount2 : correctCount1 - correctCount2;
 
+            // Get user inputs as integers
             const userCount1 = parseInt(count1.innerText);
             const userCount2 = parseInt(count2.innerText);
             const userAnswerValue = parseInt(userAnswer.innerText);
 
             let incorrectFields = [];
 
+            // Check if user's inputs match the correct values
             if (userCount1 !== correctCount1) {
                 incorrectFields.push(count1);
             }
@@ -280,6 +291,7 @@
                 incorrectFields.push(userAnswer);
             }
 
+            // If there are no incorrect fields, display success modal, otherwise mark incorrect fields in red
             if (incorrectFields.length === 0) {
                 showModal('Great job well done!');
                 regenerateEquation();
@@ -290,6 +302,7 @@
             }
         }
 
+        // Function to handle number pad input
         function handleNumberClick(number) {
             if (activeInput) {
                 activeInput.innerText = number;
@@ -298,34 +311,50 @@
             }
         }
 
+        // Function to open the number pad
         function openNumberPad(event) {
             activeInput = event.target;
             document.getElementById('number-pad-modal').style.display = 'flex';
         }
 
+        // Function to close the number pad
         function closeNumberPad() {
             document.getElementById('number-pad-modal').style.display = 'none';
             activeInput = null;
         }
 
+        // Function to display the modal with a given message
         function showModal(message) {
+            // Set the appropriate GIF based on the message (success or try again)
             const gifUrl = message.includes('Great job') ? 'https://i.giphy.com/D2hncA3u88gmeCFeoh.webp' : 'https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExdHdyejFxN2ppYWR4MmJ5amczb3Bqc3VmNWZhZG41aGx1OHk5ejAxcyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/dry8S89ncvPMrmgwvr/giphy.webp';
             modalMessage.innerHTML = `<img src="${gifUrl}" alt="Reaction GIF" class="modal-gif">`;
             modalTitle.textContent = message;
             modal.style.display = 'flex';
         }
 
+        // Function to close the modal
         function closeModal() {
             modal.style.display = 'none';
         }
 
+        // Function to regenerate a new math equation
         function regenerateEquation() {
             // List of fruit emojis to randomize
             const fruitEmojis = ['🍎', '🍌', '🍇', '🍊', '🍉', '🍓', '🍒', '🍍', '🍐', '🍋'];
 
-            // Generating a random number of fruits (maximum of 5 for each group, suitable for 5-year-olds)
-            const numFruits1 = Math.floor(Math.random() * 5) + 1;
-            const numFruits2 = Math.floor(Math.random() * 5) + 1;
+            // Randomly decide whether the equation is addition or subtraction with a 50% probability
+            const isAddition = Math.random() < 0.65;
+            const operatorElement = document.querySelector('.operator');
+            operatorElement.textContent = isAddition ? '+' : '-';
+
+            // Generating random numbers of fruits (maximum of 5 for each group, suitable for 5-year-olds)
+            let numFruits1 = Math.floor(Math.random() * 5) + 1;
+            let numFruits2 = Math.floor(Math.random() * 5) + 1;
+
+            // Ensure numFruits1 >= numFruits2 for subtraction to avoid negative answers
+            if (!isAddition && numFruits1 < numFruits2) {
+                [numFruits1, numFruits2] = [numFruits2, numFruits1];
+            }
 
             // Selecting random fruit
             const fruit = fruitEmojis[Math.floor(Math.random() * fruitEmojis.length)];
@@ -333,6 +362,7 @@
             const objectsContainer = document.getElementById('objects-container');
             const objectsContainer2 = document.getElementById('objects-container-2');
 
+            // Clear existing fruits and add new ones
             objectsContainer.innerHTML = '';
             for (let i = 0; i < numFruits1; i++) {
                 objectsContainer.innerHTML += `<span class="emoji">${fruit}</span>`;
@@ -343,6 +373,7 @@
                 objectsContainer2.innerHTML += `<span class="emoji">${fruit}</span>`;
             }
 
+            // Reset input fields and their styles
             count1.innerText = '?';
             count2.innerText = '?';
             userAnswer.innerText = '?';
@@ -350,9 +381,11 @@
             count2.style.borderColor = '';
             userAnswer.style.borderColor = '';
 
+            // Show toast message indicating new numbers have been generated
             showToast();
         }
 
+        // Function to show toast message
         function showToast() {
             toastMessage.className = 'show';
             setTimeout(() => {
