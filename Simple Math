@@ -191,6 +191,37 @@
             font-size: 50px;
             margin: 0 20px;
         }
+        #trophy-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        #trophy-content {
+            background: white;
+            padding: 50px;
+            border-radius: 20px;
+            text-align: center;
+            position: relative;
+            box-sizing: border-box;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+            width: 90%;
+            max-width: 600px;
+        }
+        .trophy-img {
+            width: 100%;
+            max-width: 300px;
+            height: auto;
+            margin-bottom: 20px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
     </style>
 </head>
 <body>
@@ -245,6 +276,14 @@
         </div>
     </div>
     <div id="toast-message">New numbers have been generated!</div>
+    <div id="trophy-modal">
+        <div id="trophy-content">
+            <h2>Congratulations!</h2>
+            <p>You have answered correctly multiple times in a row correctly!</p>
+            <img src="https://i.giphy.com/9xt1MUZqkneFiWrAAD.webp" alt="Trophy" class="trophy-img">
+            <button id="close-trophy-button" onclick="closeTrophyModal()">Close</button>
+        </div>
+    </div>
 
     <script>
         // Wait until DOM content is loaded before running the regenerateEquation function
@@ -262,7 +301,9 @@
         const count1 = document.getElementById('count1');
         const count2 = document.getElementById('count2');
         const toastMessage = document.getElementById('toast-message');
+        const trophyModal = document.getElementById('trophy-modal');
         let activeInput = null;
+        let correctStreak = 0;
 
         // Adding event listeners for validation and regeneration buttons
         validateButton.addEventListener('click', validateAnswer);
@@ -297,12 +338,19 @@
 
             // If there are no incorrect fields, display success modal, otherwise mark incorrect fields in red
             if (incorrectFields.length === 0) {
+                correctStreak++;
                 showModal('Great job well done!');
                 regenerateEquation();
                 showToast();
+
+                if (correctStreak >= 3) {
+                    setTimeout(showTrophyModal, 500);
+                    correctStreak = 0;
+                }
             } else {
                 incorrectFields.forEach(field => field.style.borderColor = 'red');
                 showModal('Oops lets try again!');
+                correctStreak = 0;
             }
         }
 
@@ -395,6 +443,16 @@
             setTimeout(() => {
                 toastMessage.className = toastMessage.className.replace('show', '');
             }, 3000);
+        }
+
+        // Function to show trophy modal
+        function showTrophyModal() {
+            trophyModal.style.display = 'flex';
+        }
+
+        // Function to close trophy modal
+        function closeTrophyModal() {
+            trophyModal.style.display = 'none';
         }
     </script>
 </body>
