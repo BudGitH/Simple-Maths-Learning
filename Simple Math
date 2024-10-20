@@ -351,9 +351,9 @@
             const operatorElement = document.querySelector('.operator');
             operatorElement.textContent = isAddition ? '+' : '-';
 
-            // Generating random numbers of fruits (maximum of 10 for each group to increase variation)
-            let numFruits1 = Math.floor(Math.random() * 10) + 1;
-            let numFruits2 = Math.floor(Math.random() * 10) + 1;
+            // Generating random numbers of fruits (maximum of 5 for each group to increase variation)
+            let numFruits1 = Math.floor(Math.random() * 5) + 1;
+            let numFruits2 = Math.floor(Math.random() * 5) + 1;
 
             // Ensure numFruits1 >= numFruits2 for subtraction to avoid negative answers
             if (!isAddition && numFruits1 < numFruits2) {
