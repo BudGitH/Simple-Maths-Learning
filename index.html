@@ -1952,10 +1952,10 @@ html[data-theme="space"] .pad { background: rgba(255,255,255,.16); box-shadow: i
     return (step.id === 'r' ? makes(q) : 'That is ' + step.value) + '. Tap ' + step.value + '!';
   }
 
+  // the number sentence is what teaches, so it always leads; the streak is a short add-on
   function finalText(q, streak) {
-    if (streak >= 3) return streak + ' in a row! Wow!';
-    if (q.kind === 'count') return 'Yes! ' + q.answer + ' ' + nounFor(q, q.answer) + '!';
-    return makes(q) + '!';
+    const sentence = q.kind === 'count' ? 'Yes! ' + q.answer + ' ' + nounFor(q, q.answer) + '!' : makes(q) + '!';
+    return streak === 3 ? sentence + ' 3 in a row!' : sentence;
   }
 
   /* ---------- rendering: bubble, mascot, HUD ---------- */
@@ -2328,7 +2328,7 @@ html[data-theme="space"] .pad { background: rgba(255,255,255,.16); box-shadow: i
     sfx.good();
     celebrate(36);
     setMood('cheer', 1500);
-    say(finalText(q, streak), false);
+    say(finalText(q, streak), true);
     el.next.hidden = false;
     if (padHadFocus) el.next.focus({ preventScroll: true });
     laterWhenVisible(advance, ADVANCE_MS);
