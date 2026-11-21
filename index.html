@@ -1611,6 +1611,1015 @@ html[data-theme="space"] .pad { background: rgba(255,255,255,.16); box-shadow: i
    #slot-a active, question 2 of 5, 12 stars) is placeholder: replace the
    contents of #group-a/#group-b, slots, #say, #trail, counts at startup.
    ===================================================================== */
+
+(function () {
+  'use strict';
+
+  /* ===================================================================
+     GAME LOGIC
+     Sections: constants and data, state, storage, sound and speech,
+     questions, rendering, question flow, rounds and screens,
+     grown-ups panel, events, start-up.
+     =================================================================== */
+
+  /* ---------- constants and data ---------- */
+  const STORAGE_KEY = 'simpleMathFun.v1';
+  const ROUND_LENGTH = 5;
+  const MAX_LEVEL = 6;
+  const RECENT_MAX = 6;          // results remembered for the level rules
+  const HOLD_MS = 1000;          // press-and-hold time (matches --hold-ms)
+  const ARM_MS = 5000;           // reset stays armed this long
+  const ADVANCE_MS = 1500;       // pause before the next question
+  const STEP_PAUSE_MS = 800;     // pause between steps of one question
+  const WRONG_LOCK_MS = 450;     // taps are ignored briefly after a wrong try
+  const AUTO_COUNT_MS = 600;     // one object per beat while the game counts
+  const OUTCOMES = ['first', 'later', 'worked'];
+  const OPS = ['auto', 'add', 'sub', 'both'];
+  const RESET_NOTE = 'Clears stars, stickers and level on this device.';
+  const MINUS = '−';
+
+  const item = (e, one, many) => ({ e: e, one: one, many: many });
+  const THEMES = [
+    { id: 'fruit', items: [item('🍎', 'apple', 'apples'), item('🍌', 'banana', 'bananas'), item('🍓', 'strawberry', 'strawberries'), item('🍊', 'orange', 'oranges'), item('🍇', 'grape', 'grapes'), item('🍉', 'melon', 'melons'), item('🍒', 'cherry', 'cherries'), item('🍑', 'peach', 'peaches'), item('🍐', 'pear', 'pears')] },
+    { id: 'animals', items: [item('🐶', 'dog', 'dogs'), item('🐱', 'cat', 'cats'), item('🐰', 'bunny', 'bunnies'), item('🐸', 'frog', 'frogs'), item('🐥', 'chick', 'chicks'), item('🐼', 'panda', 'pandas'), item('🐷', 'pig', 'pigs'), item('🐮', 'cow', 'cows'), item('🐵', 'monkey', 'monkeys')] },
+    { id: 'space', items: [item('⭐', 'star', 'stars'), item('🌙', 'moon', 'moons'), item('🚀', 'rocket', 'rockets'), item('🪐', 'planet', 'planets'), item('👽', 'alien', 'aliens'), item('🛸', 'saucer', 'saucers'), item('☄️', 'comet', 'comets'), item('🌞', 'sun', 'suns')] },
+    { id: 'sea', items: [item('🐟', 'fish', 'fish'), item('🐙', 'octopus', 'octopuses'), item('🐳', 'whale', 'whales'), item('🦀', 'crab', 'crabs'), item('🐚', 'shell', 'shells'), item('🦑', 'squid', 'squid'), item('🐡', 'puffer fish', 'puffer fish'), item('🐬', 'dolphin', 'dolphins'), item('🦐', 'shrimp', 'shrimp')] }
+  ];
+
+  // same order as the sticker book in the markup
+  const STICKERS = [
+    ['🌈', 'Rainbow'], ['🚀', 'Rocket'], ['🦄', 'Unicorn'], ['🍩', 'Donut'], ['🦖', 'Dinosaur'], ['🎈', 'Balloon'],
+    ['🐢', 'Turtle'], ['🌻', 'Sunflower'], ['🍓', 'Strawberry'], ['🐙', 'Octopus'], ['🎸', 'Guitar'], ['🦋', 'Butterfly'],
+    ['🍦', 'Ice cream'], ['🐳', 'Whale'], ['⚽', 'Football'], ['🦁', 'Lion'], ['🌙', 'Moon'], ['🚂', 'Train'],
+    ['🐝', 'Bee'], ['🍉', 'Watermelon'], ['🦉', 'Owl'], ['🎁', 'Present'], ['🐧', 'Penguin'], ['⭐', 'Star']
+  ];
+  const GOLD_STAR = ['🌟', 'Gold star'];
+
+  // C major pentatonic, rising: C5 D5 E5 G5 A5 C6 D6 E6 G6 A6
+  const NOTES = [523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.66, 1318.51, 1567.98, 1760];
+  const PRAISE = ['Yes', 'Great', 'Super', 'Nice'];
+  const CONFETTI_COLOURS = ['#ff5b6e', '#ffc531', '#2fbf71', '#1fa7e8', '#8b6cff', '#ff8d3a'];
+
+  /* ---------- state: one object; `run` is never saved ---------- */
+  function freshProgress() {
+    return { level: 1, recent: [], totalStars: 0, stickers: [], round: { stars: [], theme: 0 } };
+  }
+
+  const state = Object.assign(freshProgress(), {
+    muted: false,
+    speech: true,
+    op: 'auto',
+    run: {
+      q: null,               // the question on screen
+      screen: 'play',        // play | round | book
+      panelOpen: false,
+      inertEl: null,         // screen made inert while the panel is open
+      dirty: false,          // a setting changed: deal a fresh question on close
+      gesture: false,        // the child has touched the page (audio and speech may start)
+      keyboard: false,       // last answer came from a physical key
+      decks: {},             // shuffled facts per pool
+      reask: [],             // worked facts that come back later
+      lastId: '',
+      lastEmoji: '',
+      levelUp: false,
+      intro: '',             // text put in front of the next prompt
+      newSticker: -1,
+      timers: new Set(),
+      moodTimer: 0, speakTimer: 0, confettiTimer: 0, armTimer: 0
+    }
+  });
+  const run = state.run;
+
+  /* ---------- elements ---------- */
+  const $ = (id) => document.getElementById(id);
+  const el = {
+    play: $('screen-play'), round: $('screen-round'), book: $('screen-book'), parents: $('screen-parents'),
+    levelBadge: $('level-badge'), levelNum: $('level-num'), stars: $('stars'), starCount: $('star-count'),
+    trail: $('trail'), mute: $('mute-btn'), bookBtn: $('book-btn'), gear: $('gear-btn'),
+    mascot: $('mascot'), say: $('say'), speak: $('speak-btn'),
+    stage: $('stage'), groupA: $('group-a'), groupB: $('group-b'), next: $('next-btn'),
+    equation: $('equation'), slotA: $('slot-a'), eqOp: $('eq-op'), slotB: $('slot-b'), slotR: $('slot-r'),
+    pad: $('pad'),
+    roundMascot: $('round-mascot'), roundTitle: $('round-title'), roundSticker: $('round-sticker'),
+    roundStars: $('round-stars'), roundTotal: $('round-total'), again: $('again-btn'), roundBook: $('round-book-btn'),
+    bookBack: $('book-back-btn'), bookCount: $('book-count'), bookGrid: $('book-grid'),
+    parentsClose: $('parents-close-btn'), optSpeech: $('opt-speech'), reset: $('reset-btn'), resetNote: $('reset-note'),
+    confetti: $('confetti'), levelup: $('levelup'), levelupNum: $('levelup-num')
+  };
+  const dots = Array.from(el.trail.children);
+  const padKeys = [];            // pad keys by number (0..10)
+  Array.from(el.pad.querySelectorAll('.key')).forEach((key) => { padKeys[Number(key.dataset.n)] = key; });
+
+  /* ---------- small helpers ---------- */
+  function pick(list) { return list[Math.floor(Math.random() * list.length)]; }
+  function rand(min, max) { return Math.round(min + Math.random() * (max - min)); }
+  function sum(list) { return list.reduce((total, n) => total + n, 0); }
+  function shuffle(list) {
+    for (let i = list.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const swap = list[i]; list[i] = list[j]; list[j] = swap;
+    }
+    return list;
+  }
+  // replay a CSS animation that is tied to a class
+  function restart(node, cls) {
+    node.classList.remove(cls);
+    void node.offsetWidth;
+    node.classList.add(cls);
+  }
+
+  /* ---------- timers ---------- */
+  function later(fn, ms) {
+    const id = setTimeout(() => { run.timers.delete(id); fn(); }, ms);
+    run.timers.add(id);
+  }
+  function clearTimers() {
+    run.timers.forEach(clearTimeout);
+    run.timers.clear();
+  }
+  // true while the play screen is not what the child is looking at
+  function blocked() { return run.panelOpen || run.screen !== 'play'; }
+  // like `later`, but waits (silently) until the play screen is visible again
+  function laterWhenVisible(fn, ms) {
+    later(() => { if (blocked()) laterWhenVisible(fn, ms); else fn(); }, ms);
+  }
+
+  /* ---------- storage (every access guarded) ---------- */
+  function validInt(v, min, max) { return Number.isInteger(v) && v >= min && v <= max; }
+
+  function applySaved(raw) {
+    if (!raw || typeof raw !== 'object') return;
+    if (validInt(raw.level, 1, MAX_LEVEL)) state.level = raw.level;
+    if (Array.isArray(raw.recent)) state.recent = raw.recent.filter((r) => OUTCOMES.indexOf(r) >= 0).slice(-RECENT_MAX);
+    if (validInt(raw.totalStars, 0, 1e9)) state.totalStars = raw.totalStars;
+    if (Array.isArray(raw.stickers)) {
+      state.stickers = raw.stickers.filter((s, i, all) => validInt(s, 0, STICKERS.length - 1) && all.indexOf(s) === i);
+    }
+    state.muted = raw.muted === true;
+    state.speech = raw.speech !== false;
+    if (OPS.indexOf(raw.op) >= 0) state.op = raw.op;
+    const round = raw.round;
+    if (round && typeof round === 'object') {
+      if (Array.isArray(round.stars)) state.round.stars = round.stars.filter((s) => validInt(s, 1, 3)).slice(0, ROUND_LENGTH);
+      if (validInt(round.theme, 0, THEMES.length - 1)) state.round.theme = round.theme;
+    }
+  }
+
+  function load() {
+    try {
+      const text = window.localStorage.getItem(STORAGE_KEY);
+      if (text) applySaved(JSON.parse(text));
+    } catch (e) { /* storage unavailable or damaged: start fresh */ }
+  }
+
+  function save() {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state, (key, value) => (key === 'run' ? undefined : value)));
+    } catch (e) { /* storage unavailable: the game still plays */ }
+  }
+
+  /* ---------- sound (Web Audio, no files) ---------- */
+  const audio = { ctx: undefined };   // undefined = not tried yet, null = unavailable
+
+  function getAudio() {
+    if (audio.ctx === undefined) {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        audio.ctx = AudioCtx ? new AudioCtx() : null;
+      } catch (e) { audio.ctx = null; }
+    }
+    const ctx = audio.ctx;
+    if (ctx && ctx.state === 'suspended') {
+      try {
+        const resumed = ctx.resume();
+        if (resumed && resumed.catch) resumed.catch(() => {});
+      } catch (e) { /* ignore */ }
+    }
+    return ctx;
+  }
+
+  function tone(freq, delay, length, type, volume) {
+    if (state.muted) return;
+    const ctx = getAudio();
+    if (!ctx) return;
+    try {
+      const start = ctx.currentTime + delay;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, start);
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(volume, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + length);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + length + 0.05);
+    } catch (e) { /* sound is optional */ }
+  }
+
+  const sfx = {
+    count: (n) => tone(NOTES[(n - 1) % NOTES.length], 0, 0.35, 'triangle', 0.2),
+    good: () => [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone(f, i * 0.09, 0.3, 'triangle', 0.18)),
+    miss: () => { tone(220, 0, 0.28, 'sine', 0.12); tone(174.6, 0.13, 0.35, 'sine', 0.1); },
+    fanfare: () => {
+      [523.25, 659.25, 783.99, 1046.5, 783.99, 1046.5, 1318.51].forEach((f, i) => tone(f, i * 0.13, 0.4, 'triangle', 0.17));
+      tone(1567.98, 0.95, 0.7, 'sine', 0.12);
+    }
+  };
+
+  /* ---------- speech (additive; fails silently) ---------- */
+  function cancelSpeech() {
+    clearTimeout(run.speakTimer);
+    el.speak.classList.remove('is-speaking');
+    try { window.speechSynthesis.cancel(); } catch (e) { /* ignore */ }
+  }
+
+  function speak(text) {
+    if (state.muted) return;
+    try {
+      const synth = window.speechSynthesis;
+      if (!synth || typeof SpeechSynthesisUtterance === 'undefined') return;
+      synth.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.85;
+      utterance.pitch = 1.15;
+      const done = () => { clearTimeout(run.speakTimer); el.speak.classList.remove('is-speaking'); };
+      utterance.onend = done;
+      utterance.onerror = done;
+      el.speak.classList.add('is-speaking');
+      clearTimeout(run.speakTimer);
+      run.speakTimer = setTimeout(done, 5000);   // in case the browser never reports the end
+      synth.speak(utterance);
+    } catch (e) { el.speak.classList.remove('is-speaking'); }
+  }
+
+  /* ---------- questions: pools, decks, facts ---------- */
+  // Pools: 1 count 1-10 | 2 add within 5 | 3 take away within 5 | 4 add within 10 | 5 take away within 10
+  function buildPool(pool) {
+    const facts = [];
+    const add = (kind, a, b) => facts.push({ kind: kind, a: a, b: b, id: kind + ':' + a + ':' + b });
+    if (pool === 1) for (let n = 1; n <= 10; n++) add('count', n, 0);
+    if (pool === 2) for (let a = 1; a <= 4; a++) for (let b = 1; a + b <= 5; b++) add('add', a, b);
+    if (pool === 3) for (let a = 2; a <= 5; a++) for (let b = 1; b < a; b++) add('sub', a, b);
+    if (pool === 4) for (let total = 6; total <= 10; total++) for (let a = 1; a < total; a++) add('add', a, total - a);
+    if (pool === 5) for (let a = 6; a <= 10; a++) for (let b = 1; b <= a; b++) add('sub', a, b);
+    return facts;
+  }
+
+  // Which pools feed this level, given the grown-ups' operation setting.
+  function poolsFor(level, op) {
+    if (level === 1) return [1];
+    const small = level <= 3;
+    const add = small ? 2 : 4;
+    const sub = small ? 3 : 5;
+    const which = op !== 'auto' ? op : level === 6 ? 'both' : level % 2 === 0 ? 'add' : 'sub';
+    return which === 'add' ? [add] : which === 'sub' ? [sub] : [add, sub];
+  }
+
+  // Deal without replacement; reshuffle when empty; never repeat the last question.
+  function deal(pool) {
+    let deck = run.decks[pool];
+    if (!deck || !deck.length) deck = run.decks[pool] = shuffle(buildPool(pool));
+    if (deck.length > 1 && deck[deck.length - 1].id === run.lastId) deck.unshift(deck.pop());
+    return deck.pop();
+  }
+
+  // A worked fact comes back 2-3 questions later (with a different object).
+  function queueReask(q) {
+    run.reask.push({ fact: q.fact, emoji: q.item.e, due: 2 + Math.floor(Math.random() * 2) });
+  }
+
+  function takeReask() {
+    run.reask.forEach((entry) => { entry.due -= 1; });
+    const at = run.reask.findIndex((entry) => entry.due <= 0 && entry.fact.id !== run.lastId);
+    return at < 0 ? null : run.reask.splice(at, 1)[0];
+  }
+
+  function nextFact() {
+    const again = takeReask();
+    if (again) return { fact: again.fact, avoid: again.emoji };
+    return { fact: deal(pick(poolsFor(state.level, state.op))), avoid: run.lastEmoji };
+  }
+
+  // Steps: level 1 and levels 4-6 take the answer only; levels 2-3 count each group first.
+  function stepsFor(fact, answer) {
+    if (fact.kind === 'count' || state.level > 3) return [{ id: 'r', value: answer }];
+    return [{ id: 'a', value: fact.a }, { id: 'b', value: fact.b }, { id: 'r', value: answer }];
+  }
+
+  function buildQuestion(fact, avoidEmoji) {
+    const answer = fact.kind === 'add' ? fact.a + fact.b : fact.kind === 'sub' ? fact.a - fact.b : fact.a;
+    const choices = THEMES[state.round.theme].items.filter((candidate) => candidate.e !== avoidEmoji);
+    return {
+      fact: fact, kind: fact.kind, a: fact.a, b: fact.b, answer: answer,
+      item: pick(choices),
+      steps: stepsFor(fact, answer), step: 0,
+      tries: 0,           // wrong tries on the result step (decides the stars)
+      countMisses: 0,     // wrong tries on the current count step
+      count: 0,           // objects counted in the current step
+      busy: false,        // an animation owns the pad (auto-count, step pause)
+      lockUntil: 0,       // brief lock after a wrong tap
+      phase: 'active'     // active | done | left
+    };
+  }
+
+  /* ---------- wording ---------- */
+  function nounFor(q, n) { return n === 1 ? q.item.one : q.item.many; }
+  function ones(n) { return n === 1 ? 'one' : 'ones'; }
+
+  function promptFor(q, step) {
+    if (q.kind === 'count') return 'Count the ' + nounFor(q, q.a) + '!';
+    if (q.steps.length === 1) return q.kind === 'add' ? 'How many altogether?' : 'How many are left?';
+    if (step.id === 'a') return q.kind === 'add' ? 'Count the first group!' : 'Count all the ' + q.item.many + '!';
+    if (step.id === 'b') return q.kind === 'add' ? 'Now count the second group!' : 'Count the crossed ' + ones(q.b) + '!';
+    return q.kind === 'add' ? 'Now count them all!' : 'Count the ' + ones(q.answer) + ' left!';
+  }
+
+  function makes(q) {
+    if (q.kind === 'add') return q.a + ' and ' + q.b + ' make ' + q.answer;
+    if (q.kind === 'sub') return q.a + ' take away ' + q.b + ' leaves ' + q.answer;
+    return 'There ' + (q.answer === 1 ? 'is ' : 'are ') + q.answer;
+  }
+
+  function equationLabel(q) {
+    if (q.kind === 'add') return q.a + ' plus ' + q.b + ' equals what?';
+    if (q.kind === 'sub') return q.a + ' take away ' + q.b + ' equals what?';
+    return 'How many ' + q.item.many + '?';
+  }
+
+  function workedText(q, step) {
+    return (step.id === 'r' ? makes(q) : 'That is ' + step.value) + '. Tap ' + step.value + '!';
+  }
+
+  function finalText(q, streak) {
+    if (streak >= 3) return streak + ' in a row! Wow!';
+    if (q.kind === 'count') return 'Yes! ' + q.answer + ' ' + nounFor(q, q.answer) + '!';
+    return makes(q) + '!';
+  }
+
+  /* ---------- rendering: bubble, mascot, HUD ---------- */
+  function say(text, spoken) {
+    el.say.textContent = text;
+    restart(el.say, 'is-new');
+    if (spoken && run.gesture && state.speech) speak(text);
+  }
+
+  function setMood(mood, holdMs) {
+    clearTimeout(run.moodTimer);
+    el.mascot.dataset.mood = mood;
+    if (holdMs) run.moodTimer = setTimeout(() => { el.mascot.dataset.mood = 'idle'; }, holdMs);
+  }
+
+  function renderLevel() {
+    el.levelNum.textContent = state.level;
+    el.levelBadge.setAttribute('aria-label', 'Level ' + state.level);
+  }
+
+  function renderStars(gained) {
+    el.starCount.textContent = state.totalStars;
+    el.stars.setAttribute('aria-label', state.totalStars + (state.totalStars === 1 ? ' star' : ' stars'));
+    if (gained) restart(el.stars, 'is-gain');
+  }
+
+  function renderTrail() {
+    const done = state.round.stars.length;
+    const now = run.q && run.q.phase === 'active' ? done : -1;
+    dots.forEach((dot, i) => { dot.dataset.state = i < done ? 'done' : i === now ? 'now' : 'todo'; });
+    el.trail.setAttribute('aria-label', 'Question ' + Math.min(done + 1, ROUND_LENGTH) + ' of ' + ROUND_LENGTH);
+  }
+
+  /* ---------- rendering: stage, objects, equation, pad ---------- */
+  function makeObject(q) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'obj';
+    button.setAttribute('aria-label', q.item.one);
+    const emoji = document.createElement('span');
+    emoji.className = 'obj-emoji';
+    emoji.setAttribute('aria-hidden', 'true');
+    emoji.textContent = q.item.e;
+    button.append(emoji);
+    return button;
+  }
+
+  function fillTray(tray, n, q) {
+    tray.textContent = '';
+    for (let i = 0; i < n; i++) tray.append(makeObject(q));
+  }
+
+  function renderStage(q) {
+    el.play.dataset.mode = q.kind;
+    fillTray(el.groupA, q.a, q);
+    fillTray(el.groupB, q.kind === 'add' ? q.b : 0, q);
+    el.groupA.setAttribute('aria-label', q.kind === 'add' ? 'First group of ' + q.item.many : q.item.many);
+    el.groupB.setAttribute('aria-label', 'Second group of ' + q.item.many);
+    el.eqOp.textContent = q.kind === 'sub' ? MINUS : '+';
+    el.equation.setAttribute('aria-label', equationLabel(q));
+    el.next.hidden = true;
+  }
+
+  function objects() { return Array.from(el.stage.querySelectorAll('.obj')); }
+
+  // The objects the child may tap (and the game counts) in the current step.
+  function stepTargets() {
+    const q = run.q;
+    const id = q.steps[q.step].id;
+    const a = Array.from(el.groupA.children);
+    const b = Array.from(el.groupB.children);
+    if (q.kind === 'add') return id === 'a' ? a : id === 'b' ? b : a.concat(b);
+    if (q.kind === 'sub') {
+      if (id === 'a') return a;
+      return a.filter((o) => o.classList.contains('is-gone') === (id === 'b'));
+    }
+    return a;
+  }
+
+  function setTargets() {
+    const targets = stepTargets();
+    objects().forEach((o) => { o.disabled = targets.indexOf(o) < 0; });
+  }
+
+  function setObjectLabel(obj, n) {
+    const q = run.q;
+    const base = obj.classList.contains('is-gone') ? q.item.one + ', taken away' : q.item.one;
+    obj.setAttribute('aria-label', n ? base + ', counted ' + n : base);
+  }
+
+  function countObject(obj) {
+    const q = run.q;
+    q.count += 1;
+    obj.classList.add('is-counted');
+    const badge = document.createElement('span');
+    badge.className = 'obj-badge';
+    badge.setAttribute('aria-hidden', 'true');
+    badge.textContent = q.count;
+    obj.append(badge);
+    setObjectLabel(obj, q.count);
+    sfx.count(q.count);
+  }
+
+  function clearCounts() {
+    run.q.count = 0;
+    objects().forEach((obj) => {
+      obj.classList.remove('is-counted');
+      const badge = obj.querySelector('.obj-badge');
+      if (badge) badge.remove();
+      setObjectLabel(obj, 0);
+    });
+  }
+
+  // subtraction: the last `b` objects are taken away (crossed out, still visible)
+  function crossOut() {
+    const q = run.q;
+    const all = Array.from(el.groupA.children);
+    all.slice(all.length - q.b).forEach((obj) => {
+      obj.classList.add('is-gone');
+      setObjectLabel(obj, 0);
+    });
+  }
+
+  function slotFor(id) { return { a: el.slotA, b: el.slotB, r: el.slotR }[id]; }
+
+  function setSlot(slot, mark, value) {
+    slot.dataset.state = mark;
+    slot.textContent = value === '' ? '' : String(value);
+  }
+
+  function renderSlots() {
+    const q = run.q;
+    if (q.steps.length === 1) {
+      const given = q.kind !== 'count';
+      setSlot(el.slotA, given ? 'filled' : 'pending', given ? q.a : '');
+      setSlot(el.slotB, given ? 'filled' : 'pending', given ? q.b : '');
+      setSlot(el.slotR, 'active', '');
+      return;
+    }
+    q.steps.forEach((step, i) => {
+      const mark = i < q.step ? 'correct' : i === q.step ? 'active' : 'pending';
+      setSlot(slotFor(step.id), mark, i < q.step ? step.value : '');
+    });
+  }
+
+  function resetPad() {
+    padKeys.forEach((key) => { key.classList.remove('is-dim', 'is-hint'); key.disabled = false; });
+  }
+
+  function lockPad() {
+    padKeys.forEach((key) => { key.classList.remove('is-hint'); key.disabled = true; });
+  }
+
+  // pause the pad (e.g. while the game counts); keys dimmed by wrong tries stay off
+  function setPadPaused(paused) {
+    padKeys.forEach((key) => { key.disabled = paused || key.classList.contains('is-dim'); });
+  }
+
+  function dimKey(n) {
+    padKeys[n].classList.add('is-dim');
+    padKeys[n].disabled = true;
+  }
+
+  /* ---------- confetti, level-up ---------- */
+  function celebrate(count) {
+    for (let i = 0; i < count; i++) {
+      const shape = pick(['', 'confetti--round', 'confetti--star']);
+      const size = shape === 'confetti--star' ? rand(16, 24) : rand(9, 14);
+      const piece = document.createElement('i');
+      piece.className = ('confetti ' + shape).trim();
+      piece.style.cssText = '--x:' + rand(0, 100) + '%;--dx:' + rand(-90, 90) + 'px;--rot:' + rand(300, 900) + 'deg;' +
+        '--dur:' + (1.4 + Math.random() * 0.8).toFixed(2) + 's;--delay:' + (Math.random() * 0.4).toFixed(2) + 's;' +
+        '--c:' + pick(CONFETTI_COLOURS) + ';--w:' + size + 'px;--h:' + rand(12, 18) + 'px';
+      el.confetti.append(piece);
+    }
+    restart(el.confetti, 'is-on');
+    clearTimeout(run.confettiTimer);
+    run.confettiTimer = setTimeout(clearConfetti, 2700);
+  }
+
+  function clearConfetti() {
+    clearTimeout(run.confettiTimer);
+    el.confetti.classList.remove('is-on');
+    Array.from(el.confetti.querySelectorAll('.confetti')).forEach((piece) => piece.remove());
+  }
+
+  function showLevelUp() {
+    el.levelupNum.textContent = state.level;
+    restart(el.levelup, 'is-show');
+    sfx.fanfare();
+  }
+
+  /* ---------- question flow ---------- */
+  function startQuestion() {
+    clearTimers();
+    const next = nextFact();
+    const q = run.q = buildQuestion(next.fact, next.avoid);
+    run.lastId = q.fact.id;
+    run.lastEmoji = q.item.e;
+    document.documentElement.dataset.theme = THEMES[state.round.theme].id;
+    renderStage(q);
+    renderLevel();
+    renderStars(false);
+    renderTrail();
+    if (run.levelUp) {
+      run.levelUp = false;
+      run.intro = 'Level up! ';
+      setMood('cheer', 1800);
+      showLevelUp();
+    } else {
+      setMood(state.round.stars.length === 0 ? 'wave' : 'idle', 1800);
+    }
+    enterStep(0);
+  }
+
+  function enterStep(i) {
+    const q = run.q;
+    const step = q.steps[i];
+    q.step = i;
+    q.busy = false;
+    q.countMisses = 0;
+    if (i > 0) setMood('idle');
+    if (q.kind === 'sub' && step.id !== 'a') crossOut();
+    clearCounts();
+    resetPad();
+    renderSlots();
+    setTargets();
+    say(run.intro + promptFor(q, step), true);
+    run.intro = '';
+  }
+
+  function tapObject(obj) {
+    const q = run.q;
+    if (!q || q.phase !== 'active' || q.busy || obj.disabled || obj.classList.contains('is-counted')) return;
+    countObject(obj);
+    if (q.count === stepTargets().length) say('That makes ' + q.count + '!', false);
+  }
+
+  function answer(n) {
+    const q = run.q;
+    if (!q || q.phase !== 'active' || q.busy || blocked() || Date.now() < q.lockUntil || padKeys[n].disabled) return;
+    const step = q.steps[q.step];
+    if (n === step.value) onCorrect(step); else onWrong(step, n);
+  }
+
+  function onCorrect(step) {
+    const q = run.q;
+    setSlot(slotFor(step.id), 'correct', step.value);
+    if (step.id === 'r') {
+      finishQuestion();
+      return;
+    }
+    q.busy = true;
+    resetPad();   // no glow or dimmed keys left over while the tick shows
+    sfx.good();
+    setMood('cheer', 1500);
+    say(pick(PRAISE) + ', ' + step.value + '!', false);
+    later(() => enterStep(q.step + 1), STEP_PAUSE_MS);
+  }
+
+  function onWrong(step, n) {
+    const q = run.q;
+    const slot = slotFor(step.id);
+    q.lockUntil = Date.now() + WRONG_LOCK_MS;
+    dimKey(n);
+    restart(slot, 'is-wobble');
+    setTimeout(() => slot.classList.remove('is-wobble'), 520);
+    sfx.miss();
+    setMood('think');
+    if (step.id === 'r') resultMiss(step); else countMiss(step);
+  }
+
+  // result step ladder: 1 count again, 2 the game counts, 3 worked answer
+  function resultMiss(step) {
+    const q = run.q;
+    q.tries += 1;
+    if (q.tries === 1) {
+      clearCounts();
+      say("Let's count again!", true);
+    } else if (q.tries === 2) {
+      autoCount('Watch me count!');
+    } else {
+      showWorked(step);
+    }
+  }
+
+  // count steps: the game counts once, then shows the answer
+  function countMiss(step) {
+    const q = run.q;
+    q.countMisses += 1;
+    if (q.countMisses === 1) autoCount("Let's count together!"); else showWorked(step);
+  }
+
+  function autoCount(intro) {
+    const q = run.q;
+    const targets = stepTargets();
+    clearCounts();
+    q.busy = true;
+    setPadPaused(true);
+    say(intro, true);
+    const tick = (i) => {
+      if (i < targets.length) {
+        countObject(targets[i]);
+        laterWhenVisible(() => tick(i + 1), AUTO_COUNT_MS);
+      } else {
+        q.busy = false;
+        setPadPaused(false);
+        say(targets.length ? 'Now tap the number!' : 'None left! Tap the 0.', true);
+      }
+    };
+    laterWhenVisible(() => tick(0), AUTO_COUNT_MS);
+  }
+
+  // worked answer: the sentence is on the strip, one glowing key is the only way on
+  function showWorked(step) {
+    const q = run.q;
+    const target = padKeys[step.value];
+    q.busy = false;
+    q.lockUntil = 0;   // the only live key is the right one: never swallow that tap
+    setSlot(slotFor(step.id), 'hint', step.value);
+    padKeys.forEach((key) => { key.classList.remove('is-dim'); key.disabled = key !== target; });
+    target.classList.add('is-hint');
+    say(workedText(q, step), true);
+    if (run.keyboard) target.focus({ preventScroll: true });
+  }
+
+  function outcomeOf(q) { return q.tries === 0 ? 'first' : q.tries >= 3 ? 'worked' : 'later'; }
+  function starsFor(q) { return q.tries === 0 ? 3 : q.tries === 1 ? 2 : 1; }
+
+  function firstTryStreak() {
+    let streak = 0;
+    for (let i = state.round.stars.length - 1; i >= 0 && state.round.stars[i] === 3; i--) streak += 1;
+    return streak;
+  }
+
+  // Advance 5 of the last 6 first-try; step down 3 of the last 5 worked. Returns true on a change.
+  function recordOutcome(outcome) {
+    state.recent = state.recent.concat(outcome).slice(-RECENT_MAX);
+    const firstTries = state.recent.filter((r) => r === 'first').length;
+    const worked = state.recent.slice(-5).filter((r) => r === 'worked').length;
+    let level = state.level;
+    if (firstTries >= 5 && level < MAX_LEVEL) level += 1;
+    else if (worked >= 3 && level > 1) level -= 1;
+    if (level === state.level) return false;
+    run.levelUp = level > state.level;
+    state.level = level;
+    state.recent = [];
+    run.reask = [];
+    return true;
+  }
+
+  function finishQuestion() {
+    const q = run.q;
+    q.phase = 'done';
+    q.busy = false;
+    const outcome = outcomeOf(q);
+    state.totalStars += starsFor(q);
+    state.round.stars.push(starsFor(q));
+    const levelChanged = recordOutcome(outcome);
+    if (outcome === 'worked' && !levelChanged) queueReask(q);
+    save();
+
+    const streak = outcome === 'first' ? firstTryStreak() : 0;
+    const padHadFocus = el.pad.contains(document.activeElement);
+    lockPad();
+    objects().forEach((obj) => { obj.disabled = true; });
+    renderStars(true);
+    if (streak >= 3) restart(el.stars, 'is-sparkle');
+    renderTrail();
+    sfx.good();
+    celebrate(36);
+    setMood('cheer', 1500);
+    say(finalText(q, streak), false);
+    el.next.hidden = false;
+    if (padHadFocus) el.next.focus({ preventScroll: true });
+    laterWhenVisible(advance, ADVANCE_MS);
+  }
+
+  // the arrow and the timer both end up here; only a finished question can leave
+  function advance() {
+    const q = run.q;
+    if (!q || q.phase !== 'done') return;
+    q.phase = 'left';
+    dealNext();
+  }
+
+  function dealNext() {
+    clearTimers();
+    if (state.round.stars.length >= ROUND_LENGTH) finishRound(); else startQuestion();
+  }
+
+  /* ---------- rounds and screens ---------- */
+  function showScreen(name) {
+    run.screen = name;
+    el.play.hidden = name !== 'play';
+    el.round.hidden = name !== 'round';
+    el.book.hidden = name !== 'book';
+    window.scrollTo(0, 0);
+    if (name === 'round') el.again.focus({ preventScroll: true });
+    if (name === 'book') el.bookBack.focus({ preventScroll: true });
+  }
+
+  function showPlay() {
+    clearConfetti();
+    showScreen('play');
+    if (!run.q) startQuestion();
+  }
+
+  function awardSticker() {
+    const free = STICKERS.map((s, i) => i).filter((i) => state.stickers.indexOf(i) < 0);
+    if (!free.length) return -1;
+    const won = pick(free);
+    state.stickers.push(won);
+    return won;
+  }
+
+  function renderRound(stars, sticker) {
+    const gold = sticker < 0;
+    const prize = gold ? GOLD_STAR : STICKERS[sticker];
+    const total = sum(stars);
+    el.round.dataset.gold = String(gold);
+    el.roundTitle.textContent = gold ? 'Round complete! You won a gold star.' : 'Round complete! You got a new sticker.';
+    el.roundSticker.textContent = prize[0];
+    el.roundSticker.setAttribute('aria-label', gold ? 'Gold star! You have every sticker.' : 'New sticker: ' + prize[1]);
+    Array.from(el.roundStars.children).forEach((cell, i) => {
+      cell.dataset.stars = stars[i];
+      cell.setAttribute('aria-label', stars[i] + (stars[i] === 1 ? ' star' : ' stars'));
+    });
+    el.roundTotal.textContent = '+' + total;
+    el.roundTotal.setAttribute('aria-label', total + ' stars this round');
+  }
+
+  function finishRound() {
+    clearTimers();
+    const stars = state.round.stars;
+    const sticker = awardSticker();
+    run.newSticker = sticker;
+    run.q = null;
+    state.round = { stars: [], theme: (state.round.theme + 1) % THEMES.length };
+    save();
+    renderRound(stars, sticker);
+    showScreen('round');
+    sfx.fanfare();
+    celebrate(70);
+  }
+
+  function renderBook(newest) {
+    el.bookGrid.textContent = '';
+    STICKERS.forEach((sticker, i) => {
+      const earned = state.stickers.indexOf(i) >= 0;
+      const isNew = earned && i === newest;
+      const cell = document.createElement('li');
+      cell.className = 'sticker';
+      cell.dataset.earned = String(earned);
+      if (isNew) cell.dataset.new = 'true';
+      const face = document.createElement('span');
+      face.className = 'sticker-emoji';
+      face.setAttribute('role', 'img');
+      face.setAttribute('aria-label', earned ? sticker[1] + (isNew ? ', new' : '') : 'Not found yet');
+      face.textContent = sticker[0];
+      cell.append(face);
+      el.bookGrid.append(cell);
+    });
+    el.bookCount.textContent = state.stickers.length + ' / ' + STICKERS.length;
+    el.bookCount.setAttribute('aria-label', state.stickers.length + ' of ' + STICKERS.length + ' stickers');
+  }
+
+  function openBook(newest) {
+    renderBook(newest);
+    showScreen('book');
+  }
+
+  /* ---------- grown-ups panel ---------- */
+  function currentScreen() {
+    return run.screen === 'play' ? el.play : run.screen === 'round' ? el.round : el.book;
+  }
+
+  function disarmReset() {
+    clearTimeout(run.armTimer);
+    el.reset.removeAttribute('data-armed');
+    el.resetNote.textContent = RESET_NOTE;
+  }
+
+  function syncPanel() {
+    document.querySelector('input[name="start-level"][value="' + state.level + '"]').checked = true;
+    document.querySelector('input[name="op"][value="' + state.op + '"]').checked = true;
+    el.optSpeech.checked = state.speech;
+    disarmReset();
+  }
+
+  function openPanel() {
+    if (run.panelOpen) return;
+    run.panelOpen = true;
+    run.inertEl = currentScreen();
+    run.inertEl.setAttribute('inert', '');
+    syncPanel();
+    el.parents.hidden = false;
+    el.parentsClose.focus();
+  }
+
+  function closePanel() {
+    if (!run.panelOpen) return;
+    run.panelOpen = false;
+    el.parents.hidden = true;
+    run.inertEl.removeAttribute('inert');
+    disarmReset();
+    el.gear.focus();
+    if (run.dirty) {
+      run.dirty = false;
+      dealNext();
+    }
+  }
+
+  function setLevel(level) {
+    state.level = level;
+    state.recent = [];
+    run.reask = [];
+    run.levelUp = false;
+    run.dirty = true;
+    save();
+  }
+
+  function setOp(op) {
+    state.op = op;
+    run.reask = [];
+    run.dirty = true;
+    save();
+  }
+
+  function armReset() {
+    el.reset.dataset.armed = 'true';
+    el.resetNote.textContent = 'Hold once more to clear everything.';
+    run.armTimer = setTimeout(disarmReset, ARM_MS);
+  }
+
+  function resetProgress() {
+    Object.assign(state, freshProgress());
+    run.decks = {};
+    run.reask = [];
+    run.lastId = '';
+    run.lastEmoji = '';
+    run.levelUp = false;
+    run.dirty = false;
+    save();
+    syncPanel();
+    el.resetNote.textContent = 'Progress cleared.';
+    startQuestion();
+  }
+
+  function onResetHeld() {
+    if (el.reset.dataset.armed === 'true') resetProgress(); else armReset();
+  }
+
+  /* ---------- press-and-hold (gear and reset) ---------- */
+  function bindHold(button, onDone) {
+    let timer = 0;
+    let keyHeld = false;
+    const isActivation = (e) => e.key === 'Enter' || e.key === ' ';
+    const start = () => {
+      if (timer) return;
+      button.classList.add('is-holding');
+      timer = setTimeout(() => {
+        timer = 0;
+        button.classList.remove('is-holding');
+        onDone();
+      }, HOLD_MS);
+    };
+    const stop = () => {
+      clearTimeout(timer);
+      timer = 0;
+      button.classList.remove('is-holding');
+    };
+
+    button.addEventListener('pointerdown', (e) => { if (e.button === 0) start(); });
+    ['pointerup', 'pointerleave', 'pointercancel', 'blur'].forEach((type) => button.addEventListener(type, stop));
+    button.addEventListener('contextmenu', (e) => e.preventDefault());
+    button.addEventListener('keydown', (e) => {
+      if (!isActivation(e)) return;
+      e.preventDefault();
+      if (!e.repeat) { keyHeld = true; start(); }
+    });
+    // a key still held when focus moves on must not click whatever is focused next
+    document.addEventListener('keydown', (e) => { if (keyHeld && e.repeat && isActivation(e)) e.preventDefault(); }, true);
+    document.addEventListener('keyup', (e) => { if (keyHeld && isActivation(e)) { keyHeld = false; stop(); } });
+  }
+
+  /* ---------- events ---------- */
+  function pressDigit(n) {
+    run.keyboard = true;
+    const key = padKeys[n];
+    key.classList.add('is-pressed');
+    setTimeout(() => key.classList.remove('is-pressed'), 150);
+    answer(n);
+  }
+
+  function onKeyDown(e) {
+    if (run.panelOpen) {
+      if (e.key === 'Escape') closePanel();
+      return;
+    }
+    if (run.screen !== 'play' || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (/^[0-9]$/.test(e.key)) pressDigit(Number(e.key));
+  }
+
+  // browsers only allow sound and speech after a touch, click or key press
+  function unlock() {
+    run.gesture = true;
+    getAudio();
+  }
+
+  function onSettingChange(e) {
+    const target = e.target;
+    if (target.name === 'start-level') setLevel(Number(target.value));
+    else if (target.name === 'op') setOp(target.value);
+    else if (target === el.optSpeech) {
+      state.speech = target.checked;
+      if (!state.speech) cancelSpeech();
+      save();
+    }
+  }
+
+  function toggleMute() {
+    state.muted = !state.muted;
+    el.mute.setAttribute('aria-pressed', String(state.muted));
+    if (state.muted) cancelSpeech(); else sfx.count(1);
+    save();
+  }
+
+  function bindEvents() {
+    ['pointerdown', 'click', 'keydown'].forEach((type) => document.addEventListener(type, unlock, true));
+    document.addEventListener('keydown', onKeyDown);
+
+    el.pad.addEventListener('click', (e) => {
+      const key = e.target.closest('.key');
+      if (key) { run.keyboard = false; answer(Number(key.dataset.n)); }
+    });
+    el.stage.addEventListener('click', (e) => {
+      const obj = e.target.closest('.obj');
+      if (obj) tapObject(obj);
+    });
+    el.next.addEventListener('click', advance);
+    el.speak.addEventListener('click', () => speak(el.say.textContent));
+    el.mute.addEventListener('click', toggleMute);
+    el.bookBtn.addEventListener('click', () => openBook(-1));
+    el.bookBack.addEventListener('click', showPlay);
+    el.again.addEventListener('click', showPlay);
+    el.roundBook.addEventListener('click', () => openBook(run.newSticker));
+    el.parentsClose.addEventListener('click', closePanel);
+    el.parents.addEventListener('change', onSettingChange);
+    bindHold(el.gear, openPanel);
+    bindHold(el.reset, onResetHeld);
+  }
+
+  /* ---------- start-up ---------- */
+  function init() {
+    load();
+    el.mute.setAttribute('aria-pressed', String(state.muted));
+    if (!('speechSynthesis' in window)) el.speak.hidden = true;
+    bindEvents();
+    dealNext();   // resumes the round: next question, or the round end if it was complete
+  }
+
+  init();
+})();
 </script>
 </body>
 </html>
