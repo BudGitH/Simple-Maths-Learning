@@ -1,0 +1,1616 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="fruit">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<title>Simple Math Fun</title>
+<style>
+/* =====================================================================
+   SIMPLE MATH FUN — markup + styles
+   Design tokens first, then layout, then components, then states,
+   then themes, then responsive and reduced-motion rules.
+   ===================================================================== */
+
+:root {
+  --font: ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", "Nunito", "Quicksand", "Varela Round", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* fixed palette (text colours checked for >= 4.5:1 on their surfaces) */
+  --ink: #251c4b;          /* main text, 15:1 on white */
+  --ink-soft: #4b4373;     /* secondary text, 8.9:1 on white */
+  --paper: #fffdf8;
+  --white: #ffffff;
+  --gold: #ffc531;
+  --gold-deep: #c27a00;
+  --good: #14894f;         /* tick + correct border, 4.6:1 on white */
+  --good-soft: #d7f7e4;
+  --shadow-ink: rgba(37, 28, 75, .22);
+
+  /* theme tokens (fruit is the default; see [data-theme] blocks) */
+  --bg-1: #fff2a6;
+  --bg-2: #ffc078;
+  --bg-3: #ff8d8d;
+  --pattern: rgba(255, 255, 255, .34);
+  --accent: #ff5b6e;        /* fills, rings, big shapes */
+  --accent-deep: #b01f3a;   /* text/lines on white, >= 4.5:1 */
+  --accent-soft: #ffe1e5;   /* tinted surfaces */
+  --edge: #d9455a;          /* chunky bottom edge of buttons */
+  --tray-a: #fff4cc;
+  --tray-a-edge: #f2cf6b;
+  --tray-b: #ffe0e6;
+  --tray-b-edge: #f5a3b2;
+
+  /* sizing */
+  --gap: 10px;
+  --pad-x: max(10px, env(safe-area-inset-left), env(safe-area-inset-right));
+  --tool: 48px;                 /* top bar icon buttons */
+  /* object tile size: fits 5 across, and the tallest case per mode */
+  --obj: clamp(40px, min(14.2vw, (100dvh - 300px) / 5.2), 104px);
+  /* addition with a group of 6+ (3 rows over two trays) needs a bit less */
+  --obj-tight: clamp(40px, min(14.2vw, (100dvh - 400px) / 5), 104px);
+  --key-h: clamp(52px, 9dvh, 88px);
+  --key-font: clamp(32px, 5.6dvh, 46px);
+  --slot-w: clamp(58px, 9dvh, 96px);
+  --slot-h: clamp(62px, 10dvh, 104px);
+  --slot-font: clamp(42px, 7.2dvh, 72px);
+  --hold-ms: 1000ms;
+}
+
+/* ---------- themes: set data-theme on <html> ---------- */
+html[data-theme="fruit"] {
+  --bg-1: #fff2a6; --bg-2: #ffc078; --bg-3: #ff8d8d;
+  --pattern: rgba(255, 255, 255, .34);
+  --accent: #ff5b6e; --accent-deep: #b01f3a; --accent-soft: #ffe1e5; --edge: #d9455a;
+  --tray-a: #fff4cc; --tray-a-edge: #f2cf6b; --tray-b: #ffe0e6; --tray-b-edge: #f5a3b2;
+}
+html[data-theme="animals"] {
+  --bg-1: #effab0; --bg-2: #9fe39a; --bg-3: #3fbf9f;
+  --pattern: rgba(255, 255, 255, .30);
+  --accent: #2fbf71; --accent-deep: #11683d; --accent-soft: #dcf7e6; --edge: #23955a;
+  --tray-a: #f1fbd9; --tray-a-edge: #b8de7c; --tray-b: #fff0d0; --tray-b-edge: #ecc27a;
+}
+html[data-theme="space"] {
+  --bg-1: #5b4fd6; --bg-2: #2c2488; --bg-3: #140d42;
+  --pattern: rgba(255, 255, 255, .55);
+  --accent: #8b6cff; --accent-deep: #5230d4; --accent-soft: #ebe5ff; --edge: #5a3fd0;
+  --tray-a: #ece8ff; --tray-a-edge: #b6a6ff; --tray-b: #dff3ff; --tray-b-edge: #8fcdf2;
+}
+html[data-theme="sea"] {
+  --bg-1: #c2f4ff; --bg-2: #5ecbf5; --bg-3: #2f7fdc;
+  --pattern: rgba(255, 255, 255, .38);
+  --accent: #1fa7e8; --accent-deep: #0a5d9e; --accent-soft: #dff4ff; --edge: #1784c2;
+  --tray-a: #e3f8ff; --tray-a-edge: #8fd7f2; --tray-b: #dcfff0; --tray-b-edge: #84dcb5;
+}
+
+/* ---------- base ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; padding: 0; }
+html { background: var(--bg-2); }
+body {
+  min-height: 100dvh;
+  font-family: var(--font);
+  font-size: 20px;
+  line-height: 1.25;
+  color: var(--ink);
+  background:
+    linear-gradient(165deg, var(--bg-1) 0%, var(--bg-2) 55%, var(--bg-3) 100%) fixed;
+  -webkit-tap-highlight-color: transparent;
+  overflow-x: hidden;
+  transition: background-color .6s;
+}
+/* soft themed pattern layer */
+body::before {
+  content: "";
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    radial-gradient(circle at 25% 25%, var(--pattern) 0 5px, transparent 6px),
+    radial-gradient(circle at 75% 70%, var(--pattern) 0 9px, transparent 10px);
+  background-size: 72px 72px, 120px 120px;
+  opacity: .8;
+}
+html[data-theme="space"] body::before {
+  background-image:
+    radial-gradient(circle at 20% 30%, var(--pattern) 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 70% 80%, rgba(255,255,255,.35) 0 2.5px, transparent 3.5px),
+    radial-gradient(circle at 50% 50%, rgba(255,230,140,.5) 0 1px, transparent 2px);
+  background-size: 90px 90px, 150px 150px, 47px 47px;
+}
+html[data-theme="sea"] body::before {
+  background-image:
+    radial-gradient(circle at 30% 30%, transparent 0 7px, var(--pattern) 8px 10px, transparent 11px),
+    radial-gradient(circle at 70% 75%, transparent 0 3px, var(--pattern) 4px 5.5px, transparent 6.5px);
+  background-size: 110px 110px, 64px 64px;
+}
+html[data-theme="animals"] body::before {
+  background-image:
+    radial-gradient(ellipse 9px 6px at 30% 30%, var(--pattern) 98%, transparent 100%),
+    radial-gradient(ellipse 5px 7px at 75% 72%, var(--pattern) 98%, transparent 100%);
+  background-size: 96px 96px, 70px 70px;
+}
+
+button { font: inherit; color: inherit; }
+button:not(:disabled) { cursor: pointer; }
+:focus { outline: none; }
+:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 7px var(--white);
+}
+.sr-only {
+  position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+svg { display: block; }
+.ico { width: 26px; height: 26px; flex: none; }
+
+/* ---------- screens ---------- */
+.screen { position: relative; z-index: 1; }
+.screen:not([hidden]) { animation: screen-in .28s ease-out; }
+@keyframes screen-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* chunky tactile button base (pressed-down feel) */
+.chunky {
+  position: relative;
+  border: 0;
+  border-radius: 18px;
+  background: var(--white);
+  color: var(--ink);
+  box-shadow: 0 5px 0 var(--edge), 0 8px 14px var(--shadow-ink);
+  transform: translateY(0);
+  transition: transform .08s ease-out, box-shadow .08s ease-out, opacity .2s, background-color .2s;
+}
+.chunky:active:not(:disabled), .chunky.is-pressed {
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 var(--edge), 0 2px 5px var(--shadow-ink);
+}
+
+/* =====================================================================
+   PLAY SCREEN
+   ===================================================================== */
+#screen-play {
+  height: 100dvh;
+  min-height: 100dvh;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-areas: "top" "stage" "eq" "pad";
+  gap: 8px;
+  padding: max(8px, env(safe-area-inset-top)) var(--pad-x) max(8px, env(safe-area-inset-bottom));
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* ---------- top bar ---------- */
+.topbar {
+  grid-area: top;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas:
+    "status . tools"
+    "buddy buddy buddy";
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 8px;
+  min-width: 0;
+}
+.tb-status { grid-area: status; display: flex; align-items: center; gap: 8px; }
+.tb-tools  { grid-area: tools;  display: flex; align-items: center; gap: 10px; }
+.buddy     { grid-area: buddy;  display: flex; align-items: center; gap: 8px; min-width: 0; }
+
+.tool {
+  width: var(--tool); height: var(--tool);
+  display: grid; place-items: center;
+  border-radius: 16px;
+  padding: 0;
+  --edge: rgba(37, 28, 75, .28);
+}
+.tool .ico { width: 26px; height: 26px; }
+.tool--ghost { background: rgba(255, 255, 255, .72); }
+
+/* mute toggle: aria-pressed="true" means sound is OFF */
+#mute-btn .ico-off { display: none; }
+#mute-btn[aria-pressed="true"] .ico-on { display: none; }
+#mute-btn[aria-pressed="true"] .ico-off { display: block; }
+#mute-btn[aria-pressed="true"] { background: var(--accent-soft); }
+
+/* press-and-hold ring (gear + any .hold element) */
+.hold { position: relative; }
+.hold-ring {
+  position: absolute; inset: -5px;
+  width: calc(100% + 10px); height: calc(100% + 10px);
+  pointer-events: none;
+  transform: rotate(-90deg);
+  overflow: visible;
+}
+.hold-ring .track { fill: none; stroke: transparent; stroke-width: 5; }
+.hold-ring .fill {
+  fill: none;
+  stroke: var(--accent-deep);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  opacity: 0;
+  transition: stroke-dashoffset .25s ease-out, opacity .25s;
+}
+.hold.is-holding .hold-ring .track { stroke: rgba(255, 255, 255, .9); }
+.hold.is-holding .hold-ring .fill {
+  stroke-dashoffset: 0;
+  opacity: 1;
+  transition: stroke-dashoffset var(--hold-ms) linear, opacity .1s;
+}
+.hold.is-holding { transform: translateY(4px); box-shadow: 0 1px 0 var(--edge), 0 2px 5px var(--shadow-ink); }
+
+/* level badge */
+.level-badge {
+  width: 46px; height: 46px; flex: none;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--ink);
+  color: var(--white);
+  font-weight: 900;
+  font-size: 24px;
+  line-height: 1;
+  border: 3px solid var(--white);
+  box-shadow: 0 0 0 3px var(--accent), 0 6px 12px var(--shadow-ink);
+  position: relative;
+}
+.level-badge::after { /* tiny crown notch: decorative */
+  content: "";
+  position: absolute; top: -9px; left: 50%;
+  width: 16px; height: 9px; margin-left: -8px;
+  background: var(--gold);
+  clip-path: polygon(0 100%, 0 20%, 25% 60%, 50% 0, 75% 60%, 100% 20%, 100% 100%);
+}
+
+/* stars + trail stack */
+.progress-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; }
+.stars-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  height: 28px;
+  padding: 0 10px 0 5px;
+  border-radius: 999px;
+  background: var(--white);
+  box-shadow: 0 3px 0 rgba(37,28,75,.18);
+  font-weight: 900;
+  font-size: 20px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  position: relative;
+}
+.stars-pill .ico { width: 22px; height: 22px; }
+.star-fill { fill: var(--gold); stroke: var(--gold-deep); stroke-width: 1.6; stroke-linejoin: round; }
+
+.stars-pill.is-gain { animation: pill-gain .6s cubic-bezier(.3,1.6,.5,1); }
+@keyframes pill-gain { 0% { transform: scale(1); } 40% { transform: scale(1.28); } 100% { transform: scale(1); } }
+/* 3-in-a-row sparkle */
+.stars-pill::after {
+  content: "";
+  position: absolute; inset: -10px -14px;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    radial-gradient(circle at 10% 30%, var(--gold) 0 3px, transparent 4px),
+    radial-gradient(circle at 90% 20%, var(--white) 0 3px, transparent 4px),
+    radial-gradient(circle at 80% 90%, var(--gold) 0 2.5px, transparent 3.5px),
+    radial-gradient(circle at 20% 95%, var(--white) 0 2px, transparent 3px),
+    radial-gradient(circle at 50% 0%, var(--gold) 0 2px, transparent 3px);
+}
+.stars-pill.is-sparkle::after { animation: sparkle 1.2s ease-out; }
+@keyframes sparkle {
+  0% { opacity: 0; transform: scale(.6) rotate(0); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.35) rotate(25deg); }
+}
+
+/* 5-dot round trail */
+.trail { display: flex; gap: 6px; margin: 0; padding: 0 0 0 4px; list-style: none; align-items: center; height: 14px; }
+.dot {
+  width: 12px; height: 12px; border-radius: 50%;
+  background: rgba(37, 28, 75, .22);
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,.55);
+  transition: transform .3s, background-color .3s;
+}
+.dot[data-state="now"] {
+  background: var(--white);
+  box-shadow: 0 0 0 3px var(--accent-deep);
+  transform: scale(1.15);
+  animation: dot-now 1.4s ease-in-out infinite;
+}
+@keyframes dot-now { 50% { box-shadow: 0 0 0 5px var(--accent-deep); } }
+.dot[data-state="done"] {
+  width: 15px; height: 15px; margin: -1.5px;
+  border-radius: 0;
+  background: var(--gold);
+  box-shadow: none;
+  clip-path: polygon(50% 0, 63% 35%, 100% 38%, 71% 61%, 81% 100%, 50% 78%, 19% 100%, 29% 61%, 0 38%, 37% 35%);
+  animation: dot-done .45s cubic-bezier(.3,1.7,.5,1);
+}
+@keyframes dot-done { from { transform: scale(.2) rotate(-90deg); } to { transform: scale(1) rotate(0); } }
+html[data-theme="space"] .dot:not([data-state]) ,
+html[data-theme="space"] .dot[data-state="todo"] { background: rgba(255,255,255,.4); }
+
+/* mascot + speech bubble */
+.mascot { width: 60px; height: 60px; flex: none; overflow: visible; }
+.bubble {
+  position: relative;
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; gap: 8px;
+  min-height: 56px;
+  padding: 4px 4px 4px 16px;
+  border-radius: 22px;
+  background: var(--white);
+  box-shadow: 0 4px 0 rgba(37,28,75,.15), 0 8px 16px rgba(37,28,75,.12);
+}
+.bubble::before { /* tail toward mascot */
+  content: "";
+  position: absolute; left: -9px; top: 50%;
+  width: 20px; height: 20px; margin-top: -10px;
+  background: var(--white);
+  border-radius: 4px;
+  transform: rotate(45deg) skew(8deg, 8deg);
+}
+.say {
+  position: relative;
+  flex: 1; min-width: 0;
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.15;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.say.is-new { animation: say-in .35s ease-out; }
+@keyframes say-in { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
+#speak-btn {
+  width: 48px; height: 48px; flex: none;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  border-radius: 16px;
+  --edge: rgba(37,28,75,.22);
+  box-shadow: 0 4px 0 var(--edge);
+}
+#speak-btn.is-speaking .wave { animation: wave-pulse .8s ease-in-out infinite; }
+@keyframes wave-pulse { 50% { opacity: .25; } }
+
+/* ---------- stage ---------- */
+.stage {
+  grid-area: stage;
+  position: relative;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--obj) * .12);
+  padding: 8px;
+  border-radius: var(--radius-l, 28px);
+  background: rgba(255, 255, 255, .42);
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, .55);
+}
+html[data-theme="space"] .stage { background: rgba(255,255,255,.14); box-shadow: inset 0 0 0 3px rgba(255,255,255,.22); }
+
+.tray {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  justify-content: flex-start;
+  width: fit-content;
+  max-width: calc(var(--obj) * 5 + var(--obj) * .16 * 4 + var(--obj) * .44 + 6px);
+  column-gap: calc(var(--obj) * .16);
+  row-gap: calc(var(--obj) * .3);   /* the bigger gap after each fifth item (ten-frame rows) */
+  padding: calc(var(--obj) * .2);
+  border-radius: calc(var(--obj) * .42);
+  background: var(--tray-a);
+  box-shadow: inset 0 4px 0 rgba(37,28,75,.07), 0 0 0 3px var(--tray-a-edge), 0 6px 0 3px rgba(37,28,75,.10);
+}
+.tray[data-tray="b"] {
+  background: var(--tray-b);
+  box-shadow: inset 0 4px 0 rgba(37,28,75,.07), 0 0 0 3px var(--tray-b-edge), 0 6px 0 3px rgba(37,28,75,.10);
+}
+.tray:empty { display: none; }
+
+.stage-op {
+  width: calc(var(--obj) * .62); height: calc(var(--obj) * .62);
+  min-width: 34px; min-height: 34px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--white);
+  font-weight: 900;
+  font-size: max(24px, calc(var(--obj) * .5));
+  line-height: 1;
+  box-shadow: 0 0 0 3px var(--white);
+}
+#screen-play[data-mode="add"]:has(.tray .obj:nth-child(6)) { --obj: var(--obj-tight); }
+#screen-play[data-mode="count"] #group-b,
+#screen-play[data-mode="count"] #stage-op,
+#screen-play[data-mode="sub"] #group-b,
+#screen-play[data-mode="sub"] #stage-op { display: none; }
+
+/* ---------- objects ---------- */
+.obj {
+  position: relative;
+  width: var(--obj); height: var(--obj);
+  flex: none;
+  padding: 0;
+  border: 3px solid transparent;
+  border-radius: calc(var(--obj) * .3);
+  background: var(--white);
+  box-shadow: 0 4px 0 rgba(37,28,75,.16);
+  display: grid; place-items: center;
+  transition: background-color .2s, border-color .2s, opacity .3s;
+}
+.obj-emoji {
+  font-size: calc(var(--obj) * .64);
+  line-height: 1;
+  transition: opacity .3s, filter .3s;
+  pointer-events: none;
+}
+/* idle: a slow gentle breathe so objects invite a tap */
+.obj:not(.is-counted):not(.is-gone) .obj-emoji { animation: obj-idle 3.2s ease-in-out infinite; }
+.obj:nth-child(2n) .obj-emoji { animation-delay: -.8s; }
+.obj:nth-child(3n) .obj-emoji { animation-delay: -1.6s; }
+@keyframes obj-idle { 50% { transform: translateY(-2px) scale(1.03); } }
+.obj:active:not(:disabled):not(.is-counted) { transform: translateY(3px); box-shadow: 0 1px 0 rgba(37,28,75,.16); }
+
+/* counted: tinted tile, bounce (plays once when the class is added) + badge */
+.obj.is-counted {
+  background: var(--accent-soft);
+  border-color: var(--accent-deep);
+  animation: obj-bounce .5s cubic-bezier(.3,1.6,.5,1);
+}
+@keyframes obj-bounce {
+  0% { transform: translateY(0) scale(1); }
+  30% { transform: translateY(-14%) scale(1.12, .94); }
+  60% { transform: translateY(0) scale(.95, 1.06); }
+  100% { transform: translateY(0) scale(1); }
+}
+.obj-badge {
+  position: absolute;
+  top: -11px; right: -11px;
+  min-width: 30px; height: 30px;
+  padding: 0 5px;
+  border-radius: 15px;
+  display: grid; place-items: center;
+  background: var(--gold);
+  color: var(--ink);
+  font-size: 19px;
+  font-weight: 900;
+  line-height: 1;
+  border: 3px solid var(--white);
+  box-shadow: 0 2px 0 rgba(37,28,75,.25);
+  animation: badge-pop .4s cubic-bezier(.3,1.8,.5,1);
+  z-index: 2;
+  pointer-events: none;
+}
+@keyframes badge-pop { from { transform: scale(0); } to { transform: scale(1); } }
+
+/* taken away: crossed out and faded, stays in place */
+.obj.is-gone {
+  background: rgba(255,255,255,.55);
+  border: 3px dashed rgba(37,28,75,.35);
+  box-shadow: none;
+}
+.obj.is-gone .obj-emoji { opacity: .38; filter: grayscale(.7); }
+.obj.is-gone::after {
+  content: "";
+  position: absolute;
+  left: 8%; right: 8%; top: 50%;
+  height: 6px; margin-top: -3px;
+  border-radius: 3px;
+  background: var(--ink);
+  transform: rotate(-38deg) scaleX(1);
+  transform-origin: left center;
+  animation: strike .35s ease-out;
+}
+@keyframes strike { from { transform: rotate(-38deg) scaleX(0); } }
+.obj.is-gone.is-counted { background: var(--accent-soft); border-color: var(--accent-deep); }
+
+/* ---------- next arrow ---------- */
+.next-btn {
+  position: absolute;
+  right: 10px; bottom: 10px;
+  width: 76px; height: 76px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--good);
+  color: var(--white);
+  --edge: #0b5c34;
+  z-index: 3;
+}
+.next-btn .ico { width: 40px; height: 40px; }
+.next-btn:not([hidden]) { animation: next-in .45s cubic-bezier(.3,1.6,.5,1), next-nudge 1.6s ease-in-out .6s infinite; }
+@keyframes next-in { from { transform: scale(0) rotate(-40deg); } to { transform: scale(1); } }
+@keyframes next-nudge { 0%, 100% { translate: 0 0; } 50% { translate: 5px 0; } }
+
+/* ---------- equation strip ---------- */
+.equation {
+  grid-area: eq;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 10px;
+  min-height: calc(var(--slot-h) + 12px);
+  border-radius: 24px;
+  background: var(--paper);
+  box-shadow: 0 5px 0 rgba(37,28,75,.16), 0 10px 18px rgba(37,28,75,.12);
+}
+.eq-op {
+  font-size: calc(var(--slot-font) * .82);
+  font-weight: 900;
+  line-height: 1;
+  color: var(--ink);
+  min-width: .7em;
+  text-align: center;
+}
+#screen-play[data-mode="count"] #slot-a,
+#screen-play[data-mode="count"] #eq-op,
+#screen-play[data-mode="count"] #slot-b,
+#screen-play[data-mode="count"] #eq-equals { display: none; }
+
+.slot {
+  position: relative;
+  width: var(--slot-w); height: var(--slot-h);
+  display: grid; place-items: center;
+  border-radius: 18px;
+  font-size: var(--slot-font);
+  font-weight: 900;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  background: var(--white);
+  border: 4px dashed rgba(37,28,75,.3);
+  transition: background-color .2s, border-color .2s;
+}
+#screen-play[data-mode="count"] .slot { width: calc(var(--slot-w) * 1.25); }
+/* pending (default): dashed, quiet */
+.slot[data-state="pending"] { background: rgba(255,255,255,.6); }
+.slot[data-state="pending"]:empty::before { content: ""; width: 40%; height: 5px; border-radius: 3px; background: rgba(37,28,75,.22); }
+/* active: solid accent, gentle pulse, shows "?" when empty */
+.slot[data-state="active"] {
+  border: 4px solid var(--accent-deep);
+  background: var(--white);
+  animation: slot-pulse 1.3s ease-in-out infinite;
+}
+.slot[data-state="active"]:empty::before { content: "?"; color: var(--accent-deep); }
+@keyframes slot-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 60%, transparent); transform: scale(1); }
+  50% { box-shadow: 0 0 0 9px color-mix(in srgb, var(--accent) 0%, transparent); transform: scale(1.05); }
+}
+/* filled (given number, e.g. L4-L6 pre-filled addends) */
+.slot[data-state="filled"] { border: 4px solid rgba(37,28,75,.14); background: var(--white); }
+/* correct: green + tick badge (never colour alone) + one pop */
+.slot[data-state="correct"] {
+  border: 4px solid var(--good);
+  background: var(--good-soft);
+  animation: slot-correct .45s cubic-bezier(.3,1.7,.5,1);
+}
+.slot[data-state="correct"]::after {
+  content: "";
+  position: absolute; top: -12px; right: -12px;
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--good) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5.5 12.5l4.2 4.2L18.5 7.8' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/20px no-repeat;
+  border: 3px solid var(--white);
+  animation: badge-pop .4s cubic-bezier(.3,1.8,.5,1);
+}
+@keyframes slot-correct { 0% { transform: scale(1); } 40% { transform: scale(1.18); } 100% { transform: scale(1); } }
+/* hint: worked answer shown, waiting for the child to tap the glowing key */
+.slot[data-state="hint"] {
+  border: 4px dashed var(--gold-deep);
+  background: #fff6d6;
+  animation: hint-glow 1.2s ease-in-out infinite;
+}
+@keyframes hint-glow { 50% { box-shadow: 0 0 0 8px rgba(255,197,49,.45); } }
+/* wrong: wobble (ends on its own; remove class before re-adding) */
+.slot.is-wobble { animation: wobble .5s ease-in-out; }
+@keyframes wobble {
+  0%, 100% { transform: translateX(0) rotate(0); }
+  20% { transform: translateX(-9px) rotate(-5deg); }
+  40% { transform: translateX(8px) rotate(4deg); }
+  60% { transform: translateX(-5px) rotate(-2deg); }
+  80% { transform: translateX(3px) rotate(1deg); }
+}
+
+/* ---------- number pad ---------- */
+.pad {
+  grid-area: pad;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  padding: 10px 10px 14px;
+  width: 100%;
+  max-width: 720px;
+  justify-self: center;
+  border-radius: 26px;
+  background: rgba(255,255,255,.5);
+  box-shadow: inset 0 0 0 3px rgba(255,255,255,.6);
+}
+html[data-theme="space"] .pad { background: rgba(255,255,255,.16); box-shadow: inset 0 0 0 3px rgba(255,255,255,.22); }
+.key {
+  height: var(--key-h);
+  min-width: 48px;
+  padding: 0;
+  border: 0;
+  border-radius: 18px;
+  background: var(--white);
+  color: var(--ink);
+  font-size: var(--key-font);
+  font-weight: 900;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 6px 0 var(--edge), 0 9px 14px var(--shadow-ink);
+  transition: transform .07s ease-out, box-shadow .07s ease-out, opacity .25s, background-color .2s;
+}
+.key[data-n="10"] { grid-column: span 2; }
+.key:active:not(:disabled), .key.is-pressed {
+  transform: translateY(5px);
+  box-shadow: 0 1px 0 var(--edge), 0 2px 4px var(--shadow-ink);
+  background: var(--accent-soft);
+}
+/* disabled: pad paused (e.g. during auto-count) */
+.key:disabled { opacity: .55; cursor: default; }
+/* dimmed after a wrong try: sunken, dashed, faded (shape + opacity, not colour alone) */
+.key.is-dim {
+  opacity: .32;
+  background: transparent;
+  box-shadow: inset 0 0 0 3px rgba(37,28,75,.45);
+  outline: 3px dashed rgba(37,28,75,.0);
+  transform: translateY(5px);
+}
+/* hint: the one glowing key during the worked answer */
+.key.is-hint {
+  background: #fff6d6;
+  box-shadow: 0 6px 0 var(--gold-deep), 0 0 0 4px var(--gold), 0 0 22px 6px rgba(255,197,49,.85);
+  animation: key-hint 1.1s ease-in-out infinite;
+  position: relative; z-index: 1;
+}
+@keyframes key-hint { 50% { transform: translateY(-3px) scale(1.06); } }
+
+/* =====================================================================
+   MASCOT (inline SVG) — set data-mood on the <svg class="mascot">
+   ===================================================================== */
+.mascot .m-all { transform-origin: 60px 112px; transform-box: view-box; }
+.mascot .m-eyes { transform-origin: 60px 62px; transform-box: view-box; animation: blink 4.6s infinite; }
+@keyframes blink { 0%, 93%, 100% { transform: scaleY(1); } 95.5% { transform: scaleY(.1); } }
+.mascot .m-arm-l { transform-origin: 26px 76px; transform-box: view-box; }
+.mascot .m-arm-r { transform-origin: 94px 76px; transform-box: view-box; }
+.mascot .m-pupils { transition: transform .3s; transform-box: view-box; }
+.mascot .mouth-open, .mascot .mouth-o, .mascot .m-think-dots { display: none; }
+
+/* idle: soft breathing */
+.mascot[data-mood="idle"] .m-all, .mascot:not([data-mood]) .m-all { animation: breathe 3s ease-in-out infinite; }
+@keyframes breathe { 50% { transform: scale(1.03, .97); } }
+
+/* cheer: hop with arms up, open smile (3 hops then rests) */
+.mascot[data-mood="cheer"] .mouth-smile { display: none; }
+.mascot[data-mood="cheer"] .mouth-open { display: inline; }
+.mascot[data-mood="cheer"] .m-all { animation: hop .5s cubic-bezier(.3,.9,.5,1) 3; }
+.mascot[data-mood="cheer"] .m-arm-l { transform: rotate(60deg); }
+.mascot[data-mood="cheer"] .m-arm-r { transform: rotate(-60deg); }
+@keyframes hop {
+  0%, 100% { transform: translateY(0) scale(1); }
+  15% { transform: translateY(0) scale(1.1, .88); }
+  50% { transform: translateY(-16px) scale(.94, 1.06); }
+  85% { transform: translateY(0) scale(1.06, .94); }
+}
+
+/* think: eyes look up, little "o" mouth, thought dots, slow tilt */
+.mascot[data-mood="think"] .mouth-smile { display: none; }
+.mascot[data-mood="think"] .mouth-o { display: inline; }
+.mascot[data-mood="think"] .m-think-dots { display: inline; }
+.mascot[data-mood="think"] .m-pupils { transform: translate(3px, -4px); }
+.mascot[data-mood="think"] .m-all { animation: tilt 2.4s ease-in-out infinite; }
+.mascot[data-mood="think"] .m-think-dots circle { animation: think-dot 1.5s ease-in-out infinite; }
+.mascot[data-mood="think"] .m-think-dots circle:nth-child(2) { animation-delay: .2s; }
+.mascot[data-mood="think"] .m-think-dots circle:nth-child(3) { animation-delay: .4s; }
+@keyframes tilt { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
+@keyframes think-dot { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+
+/* wave: right arm waves (loops while set) */
+.mascot[data-mood="wave"] .m-arm-r { animation: wave 0.9s ease-in-out infinite; }
+.mascot[data-mood="wave"] .m-all { animation: breathe 3s ease-in-out infinite; }
+@keyframes wave { 0%, 100% { transform: rotate(-70deg); } 50% { transform: rotate(-115deg); } }
+
+/* =====================================================================
+   CONFETTI + LEVEL-UP (non-blocking overlays)
+   ===================================================================== */
+.confetti-layer {
+  position: fixed; inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 60;
+}
+.confetti {
+  position: absolute;
+  top: -24px;
+  left: var(--x, 50%);
+  width: var(--w, 11px);
+  height: var(--h, 16px);
+  background: var(--c, var(--accent));
+  border-radius: 3px;
+  opacity: 0;
+  animation: confetti-fall var(--dur, 1.8s) cubic-bezier(.25,.6,.45,1) var(--delay, 0s) forwards;
+}
+.confetti--round { border-radius: 50%; }
+.confetti--star { border-radius: 0; clip-path: polygon(50% 0, 63% 35%, 100% 38%, 71% 61%, 81% 100%, 50% 78%, 19% 100%, 29% 61%, 0 38%, 37% 35%); width: var(--w, 18px); height: var(--w, 18px); }
+@keyframes confetti-fall {
+  0% { opacity: 1; transform: translate3d(0, 0, 0) rotate(0); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(var(--dx, 0px), 105vh, 0) rotate(var(--rot, 540deg)); }
+}
+/* static star burst: used instead of falling confetti under reduced motion */
+.burst {
+  position: absolute; left: 50%; top: 42%;
+  width: min(70vw, 340px); height: min(70vw, 340px);
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  display: none;
+}
+
+.levelup {
+  position: fixed;
+  left: 50%; top: 38%;
+  z-index: 65;
+  pointer-events: none;
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 26px 14px 16px;
+  border-radius: 30px;
+  background: var(--white);
+  color: var(--ink);
+  box-shadow: 0 8px 0 var(--gold-deep), 0 18px 40px rgba(37,28,75,.3), 0 0 0 5px var(--gold);
+  font-weight: 900;
+  font-size: 32px;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(.4);
+}
+.levelup-badge {
+  width: 66px; height: 66px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--ink); color: var(--white);
+  font-size: 34px;
+  box-shadow: 0 0 0 4px var(--gold);
+}
+.levelup-arrows { display: flex; flex-direction: column; color: var(--good); }
+.levelup.is-show { animation: levelup 2.2s cubic-bezier(.3,1.5,.5,1) forwards; }
+@keyframes levelup {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.4) rotate(-8deg); }
+  18% { opacity: 1; transform: translate(-50%, -50%) scale(1.08) rotate(2deg); }
+  28% { transform: translate(-50%, -50%) scale(1) rotate(0); }
+  80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -62%) scale(.9); }
+}
+
+/* =====================================================================
+   ROUND END SCREEN
+   ===================================================================== */
+.screen-round, .screen-book {
+  min-height: 100dvh;
+  padding: max(16px, env(safe-area-inset-top)) var(--pad-x) max(16px, env(safe-area-inset-bottom));
+}
+.screen-round { display: grid; place-items: center; overflow-x: clip; }
+.round-card {
+  position: relative;
+  width: min(100%, 520px);
+  display: flex; flex-direction: column; align-items: center;
+  gap: 16px;
+  padding: 26px 18px 24px;
+  border-radius: 36px;
+  background: var(--paper);
+  box-shadow: 0 8px 0 rgba(37,28,75,.16), 0 24px 48px rgba(37,28,75,.22);
+}
+.reveal {
+  position: relative;
+  width: min(58vw, 230px); height: min(58vw, 230px);
+  display: grid; place-items: center;
+}
+.reveal-rays {
+  position: absolute; inset: -12%;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--gold) 70%, transparent) 0 10deg, transparent 10deg 24deg);
+  -webkit-mask: radial-gradient(circle, #000 35%, transparent 70%);
+          mask: radial-gradient(circle, #000 35%, transparent 70%);
+  animation: rays 14s linear infinite, fade-in .8s ease-out;
+}
+@keyframes rays { to { transform: rotate(360deg); } }
+@keyframes fade-in { from { opacity: 0; } }
+.reveal-disc {
+  position: relative;
+  width: 78%; height: 78%;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  background: radial-gradient(circle at 35% 30%, #fff 0 30%, var(--accent-soft) 70%);
+  border: 6px solid var(--white);
+  box-shadow: 0 0 0 5px var(--accent), 0 10px 0 5px var(--edge), 0 18px 30px rgba(37,28,75,.25);
+  animation: sticker-reveal .9s cubic-bezier(.3,1.5,.5,1) .15s both;
+}
+.reveal-emoji { font-size: min(26vw, 104px); line-height: 1; }
+@keyframes sticker-reveal {
+  0% { transform: scale(0) rotate(-200deg); }
+  70% { transform: scale(1.1) rotate(8deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+.screen-round[data-gold="true"] .reveal-disc {
+  background: radial-gradient(circle at 35% 30%, #fff8d9 0 25%, var(--gold) 75%);
+  box-shadow: 0 0 0 5px var(--gold-deep), 0 10px 0 5px #9a5f00, 0 18px 30px rgba(37,28,75,.25);
+}
+.round-mascot { position: absolute; width: 88px; height: 88px; left: 6px; top: -30px; }
+
+.round-stars { display: flex; gap: 6px; margin: 0; padding: 0; list-style: none; width: 100%; max-width: 380px; justify-content: center; }
+.round-q {
+  flex: 1 1 0; min-width: 0; height: 42px;
+  padding: 0 2px;
+  white-space: nowrap;
+  border-radius: 14px;
+  display: grid; place-items: center;
+  background: var(--white);
+  box-shadow: 0 3px 0 rgba(37,28,75,.15), inset 0 0 0 2px rgba(37,28,75,.08);
+  color: var(--gold);
+  font-size: 19px;
+  letter-spacing: -3px;
+  text-shadow: 0 1px 0 var(--gold-deep), 0 -1px 0 var(--gold-deep), 1px 0 0 var(--gold-deep), -1px 0 0 var(--gold-deep);
+  animation: badge-pop .4s cubic-bezier(.3,1.8,.5,1) both;
+}
+.round-q:nth-child(1) { animation-delay: .7s; }
+.round-q:nth-child(2) { animation-delay: .85s; }
+.round-q:nth-child(3) { animation-delay: 1s; }
+.round-q:nth-child(4) { animation-delay: 1.15s; }
+.round-q:nth-child(5) { animation-delay: 1.3s; }
+.round-q[data-stars="1"]::before { content: "\2605"; }
+.round-q[data-stars="2"]::before { content: "\2605\2605"; }
+.round-q[data-stars="3"]::before { content: "\2605\2605\2605"; }
+.round-total {
+  margin: 0;
+  display: flex; align-items: center; gap: 8px;
+  font-size: 34px; font-weight: 900; line-height: 1;
+  color: var(--ink);
+}
+.round-total .ico { width: 38px; height: 38px; }
+.round-actions { display: flex; gap: 18px; margin-top: 4px; }
+.big-btn {
+  width: 100px; height: 100px;
+  display: grid; place-items: center;
+  border-radius: 30px;
+  padding: 0;
+}
+.big-btn .ico { width: 52px; height: 52px; }
+.big-btn--go { background: var(--good); color: var(--white); --edge: #0b5c34; }
+.big-btn--book { background: var(--white); color: var(--accent-deep); }
+
+/* =====================================================================
+   STICKER BOOK
+   ===================================================================== */
+.book-wrap { width: min(100%, 760px); margin: 0 auto; }
+.book-head {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 16px;
+}
+.book-title {
+  flex: 1;
+  display: flex; align-items: center; gap: 10px;
+  margin: 0;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--white);
+  font-size: 22px; font-weight: 900;
+  box-shadow: 0 4px 0 rgba(37,28,75,.15);
+}
+.book-title .ico { color: var(--accent-deep); }
+.book-count { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--ink-soft); }
+.back-btn { width: 60px; height: 60px; display: grid; place-items: center; border-radius: 20px; padding: 0; --edge: rgba(37,28,75,.28); }
+.back-btn .ico { width: 32px; height: 32px; }
+.book-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0; padding: 14px;
+  list-style: none;
+  border-radius: 30px;
+  background: var(--paper);
+  box-shadow: 0 8px 0 rgba(37,28,75,.16), 0 20px 40px rgba(37,28,75,.18);
+}
+.sticker {
+  aspect-ratio: 1;
+  display: grid; place-items: center;
+  border-radius: 22px;
+  background: var(--white);
+  box-shadow: 0 4px 0 rgba(37,28,75,.14), inset 0 0 0 3px var(--accent-soft);
+  position: relative;
+}
+.sticker-emoji { font-size: clamp(36px, 10vw, 58px); line-height: 1; }
+.sticker[data-earned="true"] .sticker-emoji { filter: drop-shadow(0 3px 0 rgba(37,28,75,.18)); transform: rotate(-4deg); }
+.sticker[data-earned="true"]:nth-child(2n) .sticker-emoji { transform: rotate(5deg); }
+.sticker[data-earned="false"] { background: rgba(37,28,75,.06); box-shadow: inset 0 0 0 3px rgba(37,28,75,.08); }
+.sticker[data-earned="false"] .sticker-emoji { filter: grayscale(1) brightness(0); opacity: .16; }
+.sticker[data-new="true"] { box-shadow: 0 4px 0 rgba(37,28,75,.14), 0 0 0 4px var(--gold), 0 0 18px 4px rgba(255,197,49,.7); animation: badge-pop .5s cubic-bezier(.3,1.8,.5,1); }
+
+/* =====================================================================
+   GROWN-UPS PANEL (dialog over the current screen)
+   ===================================================================== */
+.screen-parents {
+  position: fixed; inset: 0;
+  z-index: 70;
+  display: grid; place-items: center;
+  padding: 16px var(--pad-x);
+  background: rgba(20, 14, 50, .55);
+  overflow-y: auto;
+}
+.parents-card {
+  width: min(100%, 560px);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  padding: 16px 16px 20px;
+  border-radius: 30px;
+  background: var(--paper);
+  box-shadow: 0 8px 0 rgba(37,28,75,.2), 0 24px 60px rgba(0,0,0,.35);
+  font-size: 20px;
+}
+.parents-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.parents-head h2 { flex: 1; margin: 0; font-size: 28px; font-weight: 900; }
+.opt-group { border: 0; margin: 0; padding: 10px 0 4px; min-width: 0; }
+.opt-group legend, .opt-label { padding: 0; margin-bottom: 10px; font-weight: 900; font-size: 20px; }
+.opt-hint { margin: 8px 0 0; font-size: 18px; color: var(--ink-soft); line-height: 1.35; }
+.seg { display: grid; gap: 10px; }
+.seg--6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.seg--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.seg-opt { position: relative; display: block; }
+.seg-opt input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.seg-opt span {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 52px;
+  padding: 6px 8px;
+  border-radius: 16px;
+  background: var(--white);
+  box-shadow: 0 4px 0 rgba(37,28,75,.22), inset 0 0 0 2px rgba(37,28,75,.12);
+  font-weight: 900; font-size: 20px; text-align: center;
+  transition: transform .08s, box-shadow .08s, background-color .2s;
+}
+.seg-opt input:checked + span {
+  background: var(--ink); color: var(--white);
+  box-shadow: 0 1px 0 rgba(37,28,75,.4);
+  transform: translateY(3px);
+}
+.seg-opt input:checked + span::before { content: "\2713\00a0"; }
+.seg--6 .seg-opt input:checked + span::before { content: none; }
+.seg-opt input:focus-visible + span { outline: 3px solid var(--ink); outline-offset: 3px; box-shadow: 0 0 0 7px var(--white); }
+.opt-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 0 6px; }
+.opt-row label { font-weight: 900; }
+/* switch */
+.switch {
+  appearance: none; -webkit-appearance: none;
+  flex: none;
+  width: 76px; height: 44px; margin: 0;
+  border-radius: 22px;
+  background: rgba(37,28,75,.25);
+  position: relative;
+  cursor: pointer;
+  transition: background-color .2s;
+}
+.switch::before {
+  content: "";
+  position: absolute; top: 5px; left: 5px;
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--white);
+  box-shadow: 0 2px 4px rgba(0,0,0,.25);
+  transition: transform .2s;
+}
+.switch::after { /* on/off glyph so state is not colour only */
+  content: "\2715";
+  position: absolute; top: 50%; right: 12px; transform: translateY(-50%);
+  font-size: 18px; font-weight: 900; color: var(--ink);
+}
+.switch:checked { background: var(--good); }
+.switch:checked::before { transform: translateX(32px); }
+.switch:checked::after { content: "\2713"; right: auto; left: 13px; color: var(--white); }
+.opt-danger { margin-top: 18px; padding-top: 16px; border-top: 3px dashed rgba(37,28,75,.14); }
+.hold-btn {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  min-height: 60px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 18px;
+  background: var(--white);
+  color: var(--ink);
+  font-weight: 900; font-size: 20px;
+  box-shadow: 0 5px 0 rgba(37,28,75,.3), inset 0 0 0 3px rgba(37,28,75,.15);
+  transition: transform .08s, box-shadow .08s;
+}
+.hold-btn > span { position: relative; }
+.hold-btn .hold-fill {
+  position: absolute; inset: 0;
+  background: #ffd7a8;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform .25s ease-out;
+}
+.hold-btn.is-holding { transform: translateY(4px); box-shadow: 0 1px 0 rgba(37,28,75,.3), inset 0 0 0 3px rgba(37,28,75,.15); }
+.hold-btn.is-holding .hold-fill { transform: scaleX(1); transition: transform var(--hold-ms) linear; }
+.hold-btn .when-armed { display: none; }
+.hold-btn[data-armed="true"] { box-shadow: 0 5px 0 #a84a00, inset 0 0 0 3px #c25e00; background: #fff1e0; }
+.hold-btn[data-armed="true"] .when-idle { display: none; }
+.hold-btn[data-armed="true"] .when-armed { display: inline; }
+
+/* =====================================================================
+   RESPONSIVE
+   ===================================================================== */
+/* roomier phones / tablets: bigger tools */
+@media (min-width: 600px) and (min-height: 700px) {
+  :root { --tool: 56px; }
+  .tool .ico { width: 30px; height: 30px; }
+  .mascot { width: 72px; height: 72px; }
+  .say { font-size: 24px; }
+  .bubble { min-height: 64px; }
+  #speak-btn { width: 56px; height: 56px; }
+  .book-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .seg--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .round-mascot { width: 120px; height: 120px; left: -20px; top: -54px; }
+}
+/* wide top bar: one row */
+@media (min-width: 720px) {
+  .topbar {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas: "buddy status tools";
+    column-gap: 18px;
+  }
+}
+/* wide landscape: stage + equation left, pad right */
+@media (orientation: landscape) and (min-width: 720px) {
+  :root {
+    --obj: clamp(40px, min((100vw - 420px) / 6.4, (100dvh - 270px) / 5.1), 96px);
+    --obj-tight: var(--obj);
+    --key-h: clamp(56px, (100dvh - 230px) / 4.6, 100px);
+    --key-font: clamp(34px, 6dvh, 50px);
+    --slot-h: clamp(62px, 11dvh, 100px);
+    --slot-w: clamp(58px, 10dvh, 92px);
+    --slot-font: clamp(42px, 7.6dvh, 70px);
+  }
+  #screen-play {
+    grid-template-columns: minmax(0, 1fr) clamp(280px, 32vw, 380px);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas: "top top" "stage pad" "eq pad";
+    column-gap: 14px;
+    row-gap: 12px;
+    padding-left: max(14px, env(safe-area-inset-left));
+    padding-right: max(14px, env(safe-area-inset-right));
+  }
+  .pad {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-content: center;
+    align-self: stretch;
+    gap: 12px;
+    padding: 14px 14px 18px;
+  }
+  .key[data-n="0"] { order: 1; }
+  .key[data-n="10"] { order: 2; }
+}
+/* short landscape phones: keep it usable (not a required target) */
+@media (orientation: landscape) and (max-height: 500px) {
+  :root { --tool: 48px; }
+  .topbar { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "buddy status tools"; }
+  .mascot { width: 48px; height: 48px; }
+  .bubble { min-height: 48px; }
+  .stage { padding: 4px; }
+}
+
+/* =====================================================================
+   REDUCED MOTION: no shake, bounce, hop or flying confetti; fades instead
+   ===================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .screen:not([hidden]),
+  .obj .obj-emoji,
+  .obj:not(.is-counted):not(.is-gone) .obj-emoji,
+  .mascot .m-all, .mascot .m-arm-r, .mascot .m-eyes,
+  .mascot[data-mood] .m-all, .mascot[data-mood="wave"] .m-arm-r,
+  .dot[data-state="now"], .dot[data-state="done"],
+  .next-btn:not([hidden]),
+  .reveal-rays, .key.is-hint,
+  .stars-pill.is-gain, .say.is-new { animation: none; }
+  .obj.is-counted, .obj-badge, .slot[data-state="correct"], .slot[data-state="correct"]::after,
+  .reveal-disc, .round-q, .sticker[data-new="true"], .obj.is-gone::after { animation: rm-fade .35s ease-out both; }
+  .round-q { animation-delay: 0s !important; }
+  .slot[data-state="active"] { animation: rm-glow 1.6s ease-in-out infinite; }
+  .slot.is-wobble { animation: rm-wrong .6s ease-in-out; }
+  .slot[data-state="hint"] { animation: none; box-shadow: 0 0 0 6px rgba(255,197,49,.5); }
+  .mascot[data-mood="wave"] .m-arm-r { transform: rotate(-100deg); }
+  .mascot[data-mood="think"] .m-think-dots circle { animation: none; opacity: .8; }
+  .confetti { display: none; }
+  .burst { display: block; }
+  .confetti-layer.is-on .burst { animation: rm-burst 1.6s ease-out forwards; }
+  .levelup { transform: translate(-50%, -50%); }
+  .levelup.is-show { animation: rm-levelup 2.2s ease-out forwards; }
+  .hold.is-holding, .key.is-dim { transform: none; }
+  .chunky, .key, .obj { transition-duration: .01s; }
+}
+@keyframes rm-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rm-glow { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 45%, transparent); } }
+@keyframes rm-wrong { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+@keyframes rm-burst { 0% { opacity: 0; } 20% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes rm-levelup { 0% { opacity: 0; } 15% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+</style>
+</head>
+<body>
+
+<!-- Shared SVG defs (gradients for both mascot copies) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="mg-body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5fe0c4"/>
+      <stop offset="1" stop-color="#22b39b"/>
+    </linearGradient>
+    <radialGradient id="mg-belly" cx=".5" cy=".4" r=".6">
+      <stop offset="0" stop-color="#e9fff8"/>
+      <stop offset="1" stop-color="#b7f3e3"/>
+    </radialGradient>
+  </defs>
+</svg>
+
+<!-- =================================================================
+     SCREEN 1: PLAY
+     ================================================================= -->
+<section id="screen-play" class="screen" data-mode="add" aria-label="Maths game">
+
+  <header class="topbar">
+    <div class="tb-status">
+      <div id="level-badge" class="level-badge" role="img" aria-label="Level 2"><span id="level-num" aria-hidden="true">2</span></div>
+      <div class="progress-stack">
+        <div id="stars" class="stars-pill" role="img" aria-label="12 stars">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path class="star-fill" d="M12 2.6l2.9 5.9 6.4.9-4.7 4.5 1.1 6.4L12 17.3l-5.7 3 1.1-6.4-4.7-4.5 6.4-.9z"/></svg>
+          <span id="star-count" aria-hidden="true">12</span>
+        </div>
+        <ol id="trail" class="trail" aria-label="Question 2 of 5">
+          <li class="dot" data-state="done"></li>
+          <li class="dot" data-state="now"></li>
+          <li class="dot" data-state="todo"></li>
+          <li class="dot" data-state="todo"></li>
+          <li class="dot" data-state="todo"></li>
+        </ol>
+      </div>
+    </div>
+
+    <nav class="tb-tools" aria-label="Game controls">
+      <button id="mute-btn" class="tool chunky" type="button" aria-label="Sound off" aria-pressed="false">
+        <svg class="ico ico-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 9.2h3.8L12.5 5v14l-5.2-4.2H3.5z" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M16 9a4.2 4.2 0 0 1 0 6M18.6 6.4a8 8 0 0 1 0 11.2" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+        <svg class="ico ico-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 9.2h3.8L12.5 5v14l-5.2-4.2H3.5z" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M15.8 9.3l5.2 5.4M21 9.3l-5.2 5.4" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>
+      </button>
+      <button id="book-btn" class="tool chunky" type="button" aria-label="Sticker book">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.8 5.6c3.1-1.4 6.2-1.3 9.2.6 3-1.9 6.1-2 9.2-.6v13.2c-3.1-1.3-6.2-1.2-9.2.7-3-1.9-6.1-2-9.2-.7z" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linejoin="round"/><path d="M12 6.4v12.9" stroke="currentColor" stroke-width="2.3"/><path d="M7.3 9.2l.7 1.4 1.5.2-1.1 1 .3 1.5-1.4-.7-1.3.7.3-1.5-1.1-1 1.5-.2z" fill="currentColor"/></svg>
+      </button>
+      <button id="gear-btn" class="tool tool--ghost chunky hold" type="button" aria-label="Grown-ups settings, press and hold">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M10.3 2h3.4l.5 2.6c.6.2 1.2.5 1.7.9l2.5-.9 1.7 2.9-2 1.7c.1.6.1 1.3 0 1.9l2 1.7-1.7 2.9-2.5-.9c-.5.4-1.1.7-1.7.9l-.5 2.6h-3.4l-.5-2.6c-.6-.2-1.2-.5-1.7-.9l-2.5.9-1.7-2.9 2-1.7a6 6 0 0 1 0-1.9l-2-1.7 1.7-2.9 2.5.9c.5-.4 1.1-.7 1.7-.9zM12 8.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8z" transform="translate(0 1)"/></svg>
+        <svg class="hold-ring" viewBox="0 0 48 48" aria-hidden="true"><circle class="track" cx="24" cy="24" r="22" pathLength="100"/><circle class="fill" cx="24" cy="24" r="22" pathLength="100"/></svg>
+      </button>
+    </nav>
+
+    <div class="buddy">
+      <!-- Mascot "Bloop": original blob creature. data-mood = idle | cheer | think | wave -->
+      <svg id="mascot" class="mascot" data-mood="idle" viewBox="0 0 120 120" aria-hidden="true">
+        <ellipse cx="60" cy="113" rx="30" ry="5" fill="rgba(37,28,75,.18)"/>
+        <g class="m-all">
+          <!-- feet -->
+          <ellipse cx="44" cy="108" rx="11" ry="7" fill="#1c9c86" stroke="#251c4b" stroke-width="3"/>
+          <ellipse cx="76" cy="108" rx="11" ry="7" fill="#1c9c86" stroke="#251c4b" stroke-width="3"/>
+          <!-- arms -->
+          <g class="m-arm-l"><path d="M28 72c-10 2-15 9-13 15 2 5 9 3 14-3" fill="url(#mg-body)" stroke="#251c4b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g>
+          <g class="m-arm-r"><path d="M92 72c10 2 15 9 13 15-2 5-9 3-14-3" fill="url(#mg-body)" stroke="#251c4b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g>
+          <!-- body: soft gumdrop with a curl on top -->
+          <path d="M60 24c-4-7-1-15 7-16 6-1 9 4 7 8-1 3-5 3-6 1 6 3 13 6 18 12 9 9 13 22 13 36 0 26-17 41-39 41S21 95 21 69c0-14 5-27 14-36 7-7 15-9 25-9z" fill="url(#mg-body)" stroke="#251c4b" stroke-width="3.2" stroke-linejoin="round"/>
+          <!-- belly -->
+          <ellipse cx="60" cy="84" rx="23" ry="17" fill="url(#mg-belly)"/>
+          <!-- shine -->
+          <path d="M34 52c3-9 9-15 17-18" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity=".7"/>
+          <!-- cheeks -->
+          <ellipse cx="36" cy="72" rx="7" ry="4.5" fill="#ff8fa8" opacity=".85"/>
+          <ellipse cx="84" cy="72" rx="7" ry="4.5" fill="#ff8fa8" opacity=".85"/>
+          <!-- eyes -->
+          <g class="m-eyes">
+            <ellipse cx="47" cy="60" rx="9" ry="11" fill="#fff" stroke="#251c4b" stroke-width="2.6"/>
+            <ellipse cx="73" cy="60" rx="9" ry="11" fill="#fff" stroke="#251c4b" stroke-width="2.6"/>
+            <g class="m-pupils">
+              <circle cx="48" cy="62" r="5.2" fill="#251c4b"/>
+              <circle cx="72" cy="62" r="5.2" fill="#251c4b"/>
+              <circle cx="49.8" cy="59.8" r="1.9" fill="#fff"/>
+              <circle cx="73.8" cy="59.8" r="1.9" fill="#fff"/>
+            </g>
+          </g>
+          <!-- mouths -->
+          <path class="mouth-smile" d="M51 76c5 6 13 6 18 0" fill="none" stroke="#251c4b" stroke-width="3.2" stroke-linecap="round"/>
+          <path class="mouth-open" d="M49 74h22c0 9-5 14-11 14s-11-5-11-14z" fill="#7a2245" stroke="#251c4b" stroke-width="3" stroke-linejoin="round"/>
+          <ellipse class="mouth-o" cx="62" cy="79" rx="4.5" ry="5" fill="#7a2245" stroke="#251c4b" stroke-width="2.6"/>
+          <g class="m-think-dots" fill="#ffffff" stroke="#251c4b" stroke-width="2">
+            <circle cx="98" cy="38" r="3"/>
+            <circle cx="106" cy="27" r="4"/>
+            <circle cx="114" cy="14" r="5"/>
+          </g>
+        </g>
+      </svg>
+      <div class="bubble">
+        <p id="say" class="say" aria-live="polite">Count the apples!</p>
+        <button id="speak-btn" class="chunky" type="button" aria-label="Say it again">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 9.2h3.8L12.5 5v14l-5.2-4.2H3.5z" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path class="wave" d="M16 9a4.2 4.2 0 0 1 0 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path class="wave" d="M18.6 6.4a8 8 0 0 1 0 11.2" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="stage" class="stage" aria-label="Things to count">
+    <!-- SAMPLE STATE (replaced at runtime): level 2, 3 + 2, counting group A, first apple counted -->
+    <div id="group-a" class="tray" data-tray="a" role="group" aria-label="First group">
+      <button class="obj is-counted" type="button" aria-label="apple, counted 1"><span class="obj-emoji" aria-hidden="true">🍎</span><span class="obj-badge" aria-hidden="true">1</span></button>
+      <button class="obj" type="button" aria-label="apple"><span class="obj-emoji" aria-hidden="true">🍎</span></button>
+      <button class="obj" type="button" aria-label="apple"><span class="obj-emoji" aria-hidden="true">🍎</span></button>
+    </div>
+    <div id="stage-op" class="stage-op" aria-hidden="true">+</div>
+    <div id="group-b" class="tray" data-tray="b" role="group" aria-label="Second group">
+      <button class="obj" type="button" aria-label="apple"><span class="obj-emoji" aria-hidden="true">🍎</span></button>
+      <button class="obj" type="button" aria-label="apple"><span class="obj-emoji" aria-hidden="true">🍎</span></button>
+    </div>
+    <button id="next-btn" class="next-btn chunky" type="button" aria-label="Next question" hidden>
+      <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12h13.5M12.5 5.5L19 12l-6.5 6.5" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </main>
+
+  <div id="equation" class="equation" role="group" aria-label="3 plus 2 equals what?">
+    <span id="slot-a" class="slot" data-state="active"></span>
+    <span id="eq-op" class="eq-op" aria-hidden="true">+</span>
+    <span id="slot-b" class="slot" data-state="pending"></span>
+    <span id="eq-equals" class="eq-op" aria-hidden="true">=</span>
+    <span id="slot-r" class="slot" data-state="pending"></span>
+  </div>
+
+  <div id="pad" class="pad" role="group" aria-label="Number pad">
+    <button class="key" type="button" data-n="0" aria-label="0">0</button>
+    <button class="key" type="button" data-n="1" aria-label="1">1</button>
+    <button class="key" type="button" data-n="2" aria-label="2">2</button>
+    <button class="key" type="button" data-n="3" aria-label="3">3</button>
+    <button class="key" type="button" data-n="4" aria-label="4">4</button>
+    <button class="key" type="button" data-n="5" aria-label="5">5</button>
+    <button class="key" type="button" data-n="6" aria-label="6">6</button>
+    <button class="key" type="button" data-n="7" aria-label="7">7</button>
+    <button class="key" type="button" data-n="8" aria-label="8">8</button>
+    <button class="key" type="button" data-n="9" aria-label="9">9</button>
+    <button class="key" type="button" data-n="10" aria-label="10">10</button>
+  </div>
+</section>
+
+<!-- =================================================================
+     SCREEN 2: ROUND END
+     ================================================================= -->
+<section id="screen-round" class="screen screen-round" aria-labelledby="round-title" hidden>
+  <div class="round-card">
+    <h2 id="round-title" class="sr-only">Round complete! You got a new sticker.</h2>
+    <svg id="round-mascot" class="mascot round-mascot" data-mood="cheer" viewBox="0 0 120 120" aria-hidden="true">
+      <ellipse cx="60" cy="113" rx="30" ry="5" fill="rgba(37,28,75,.18)"/>
+      <g class="m-all">
+        <ellipse cx="44" cy="108" rx="11" ry="7" fill="#1c9c86" stroke="#251c4b" stroke-width="3"/>
+        <ellipse cx="76" cy="108" rx="11" ry="7" fill="#1c9c86" stroke="#251c4b" stroke-width="3"/>
+        <g class="m-arm-l"><path d="M28 72c-10 2-15 9-13 15 2 5 9 3 14-3" fill="url(#mg-body)" stroke="#251c4b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g>
+        <g class="m-arm-r"><path d="M92 72c10 2 15 9 13 15-2 5-9 3-14-3" fill="url(#mg-body)" stroke="#251c4b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g>
+        <path d="M60 24c-4-7-1-15 7-16 6-1 9 4 7 8-1 3-5 3-6 1 6 3 13 6 18 12 9 9 13 22 13 36 0 26-17 41-39 41S21 95 21 69c0-14 5-27 14-36 7-7 15-9 25-9z" fill="url(#mg-body)" stroke="#251c4b" stroke-width="3.2" stroke-linejoin="round"/>
+        <ellipse cx="60" cy="84" rx="23" ry="17" fill="url(#mg-belly)"/>
+        <path d="M34 52c3-9 9-15 17-18" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity=".7"/>
+        <ellipse cx="36" cy="72" rx="7" ry="4.5" fill="#ff8fa8" opacity=".85"/>
+        <ellipse cx="84" cy="72" rx="7" ry="4.5" fill="#ff8fa8" opacity=".85"/>
+        <g class="m-eyes">
+          <ellipse cx="47" cy="60" rx="9" ry="11" fill="#fff" stroke="#251c4b" stroke-width="2.6"/>
+          <ellipse cx="73" cy="60" rx="9" ry="11" fill="#fff" stroke="#251c4b" stroke-width="2.6"/>
+          <g class="m-pupils">
+            <circle cx="48" cy="62" r="5.2" fill="#251c4b"/>
+            <circle cx="72" cy="62" r="5.2" fill="#251c4b"/>
+            <circle cx="49.8" cy="59.8" r="1.9" fill="#fff"/>
+            <circle cx="73.8" cy="59.8" r="1.9" fill="#fff"/>
+          </g>
+        </g>
+        <path class="mouth-smile" d="M51 76c5 6 13 6 18 0" fill="none" stroke="#251c4b" stroke-width="3.2" stroke-linecap="round"/>
+        <path class="mouth-open" d="M49 74h22c0 9-5 14-11 14s-11-5-11-14z" fill="#7a2245" stroke="#251c4b" stroke-width="3" stroke-linejoin="round"/>
+        <ellipse class="mouth-o" cx="62" cy="79" rx="4.5" ry="5" fill="#7a2245" stroke="#251c4b" stroke-width="2.6"/>
+        <g class="m-think-dots" fill="#ffffff" stroke="#251c4b" stroke-width="2">
+          <circle cx="98" cy="38" r="3"/><circle cx="106" cy="27" r="4"/><circle cx="114" cy="14" r="5"/>
+        </g>
+      </g>
+    </svg>
+
+    <div id="sticker-reveal" class="reveal">
+      <div class="reveal-rays" aria-hidden="true"></div>
+      <div class="reveal-disc"><span id="round-sticker" class="reveal-emoji" role="img" aria-label="New sticker: rainbow">🌈</span></div>
+    </div>
+
+    <ol id="round-stars" class="round-stars" aria-label="Stars this round">
+      <li class="round-q" data-stars="3" aria-label="3 stars"></li>
+      <li class="round-q" data-stars="3" aria-label="3 stars"></li>
+      <li class="round-q" data-stars="2" aria-label="2 stars"></li>
+      <li class="round-q" data-stars="3" aria-label="3 stars"></li>
+      <li class="round-q" data-stars="1" aria-label="1 star"></li>
+    </ol>
+    <p class="round-total">
+      <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path class="star-fill" d="M12 2.6l2.9 5.9 6.4.9-4.7 4.5 1.1 6.4L12 17.3l-5.7 3 1.1-6.4-4.7-4.5 6.4-.9z"/></svg>
+      <span id="round-total" aria-label="12 stars this round">+12</span>
+    </p>
+    <div class="round-actions">
+      <button id="again-btn" class="big-btn big-btn--go chunky" type="button" aria-label="Play again">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 5.8v12.4a1 1 0 0 0 1.5.9l9.6-6.2a1 1 0 0 0 0-1.7L10 5a1 1 0 0 0-1.5.8z" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+      </button>
+      <button id="round-book-btn" class="big-btn big-btn--book chunky" type="button" aria-label="Open sticker book">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.8 5.6c3.1-1.4 6.2-1.3 9.2.6 3-1.9 6.1-2 9.2-.6v13.2c-3.1-1.3-6.2-1.2-9.2.7-3-1.9-6.1-2-9.2-.7z" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linejoin="round"/><path d="M12 6.4v12.9" stroke="currentColor" stroke-width="2.3"/><path d="M7.3 9.2l.7 1.4 1.5.2-1.1 1 .3 1.5-1.4-.7-1.3.7.3-1.5-1.1-1 1.5-.2z" fill="currentColor"/></svg>
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- =================================================================
+     SCREEN 3: STICKER BOOK
+     ================================================================= -->
+<section id="screen-book" class="screen screen-book" aria-labelledby="book-title" hidden>
+  <div class="book-wrap">
+    <div class="book-head">
+      <button id="book-back-btn" class="back-btn chunky" type="button" aria-label="Back to the game">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 12H6M11.5 5.5L5 12l6.5 6.5" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <h2 id="book-title" class="book-title">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.8 5.6c3.1-1.4 6.2-1.3 9.2.6 3-1.9 6.1-2 9.2-.6v13.2c-3.1-1.3-6.2-1.2-9.2.7-3-1.9-6.1-2-9.2-.7z" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linejoin="round"/><path d="M12 6.4v12.9" stroke="currentColor" stroke-width="2.3"/></svg>
+        <span class="sr-only">Sticker book,</span>
+        <span id="book-count" class="book-count" aria-label="3 of 24 stickers">3 / 24</span>
+      </h2>
+    </div>
+    <ol id="book-grid" class="book-grid">
+      <li class="sticker" data-earned="true"><span class="sticker-emoji" role="img" aria-label="Rainbow">🌈</span></li>
+      <li class="sticker" data-earned="true"><span class="sticker-emoji" role="img" aria-label="Rocket">🚀</span></li>
+      <li class="sticker" data-earned="true" data-new="true"><span class="sticker-emoji" role="img" aria-label="Unicorn, new">🦄</span></li>
+      <li class="sticker" data-earned="false"><span class="sticker-emoji" role="img" aria-label="Not found yet">🍩</span></li>
+      <li class="sticker" data-earned="false"><span class="sticker-emoji" role="img" aria-label="Not found yet">🦖</span></li>
+      <li class="sticker" data-earned="false"><span class="sticker-emoji" role="img" aria-label="Not found yet">🎈</span></li>
+      <li class="sticker" data-earned="false"><span class="sticker-emoji" role="img" aria-label="Not found yet">🐢</span></li>
+      <li class="sticker" data-earned="false"><span class="sticker-emoji" role="img" aria-label="Not found yet">🌻</span></li>
+      <li class="sticker" data-earned="false"><span class="sticker-emoji" role="img" aria-label="Not found yet">🍓</span></li>
+      <li class="sticker" data-earned="false"><span class="sticker-emoji" role="img" aria-label="Not found yet">🐙</span></li>
+      <li class="sticker" data-earned="false"><span class="sticker-emoji" role="img" aria-label="Not found yet">🎸</span></li>
+      <li class="sticker" data-earned="false"><span class="sticker-emoji" role="img" aria-label="Not found yet">🦋</span></li>
+      <li class="sticker" data-earned="false"><span class="sticker-emoji" role="img" aria-label="Not found yet">🍦</span></li>
+      <li class="sticker" data-earned="false"><span class="sticker-emoji" role="img" aria-label="Not found yet">🐳</span></li>
+      <li class="sticker" data-earned="false"><span class="sticker-emoji" role="img" aria-label="Not found yet">⚽</span></li>
+      <li class="sticker" data-earned="false"><span class="sticker-emoji" role="img" aria-label="Not found yet">🦁</span></li>
+      <li class="sticker" data-earned="false"><span class="sticker-emoji" role="img" aria-label="Not found yet">🌙</span></li>
+      <li class="sticker" data-earned="false"><span class="sticker-emoji" role="img" aria-label="Not found yet">🚂</span></li>
+      <li class="sticker" data-earned="false"><span class="sticker-emoji" role="img" aria-label="Not found yet">🐝</span></li>
+      <li class="sticker" data-earned="false"><span class="sticker-emoji" role="img" aria-label="Not found yet">🍉</span></li>
+      <li class="sticker" data-earned="false"><span class="sticker-emoji" role="img" aria-label="Not found yet">🦉</span></li>
+      <li class="sticker" data-earned="false"><span class="sticker-emoji" role="img" aria-label="Not found yet">🎁</span></li>
+      <li class="sticker" data-earned="false"><span class="sticker-emoji" role="img" aria-label="Not found yet">🐧</span></li>
+      <li class="sticker" data-earned="false"><span class="sticker-emoji" role="img" aria-label="Not found yet">⭐</span></li>
+    </ol>
+  </div>
+</section>
+
+<!-- =================================================================
+     SCREEN 4: GROWN-UPS PANEL (dialog, sits over the current screen)
+     ================================================================= -->
+<section id="screen-parents" class="screen screen-parents" role="dialog" aria-modal="true" aria-labelledby="parents-title" hidden>
+  <div class="parents-card">
+    <div class="parents-head">
+      <h2 id="parents-title">Grown-ups</h2>
+      <button id="parents-close-btn" class="back-btn chunky" type="button" aria-label="Back to the game">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+
+    <fieldset id="opt-level" class="opt-group">
+      <legend>Start level</legend>
+      <div class="seg seg--6">
+        <label class="seg-opt"><input type="radio" name="start-level" value="1"><span>1</span></label>
+        <label class="seg-opt"><input type="radio" name="start-level" value="2" checked><span>2</span></label>
+        <label class="seg-opt"><input type="radio" name="start-level" value="3"><span>3</span></label>
+        <label class="seg-opt"><input type="radio" name="start-level" value="4"><span>4</span></label>
+        <label class="seg-opt"><input type="radio" name="start-level" value="5"><span>5</span></label>
+        <label class="seg-opt"><input type="radio" name="start-level" value="6"><span>6</span></label>
+      </div>
+      <p class="opt-hint">1 count · 2 add within 5 · 3 take away within 5 · 4 add within 10 · 5 take away within 10 · 6 mixed</p>
+    </fieldset>
+
+    <fieldset id="opt-op" class="opt-group">
+      <legend>Practise</legend>
+      <div class="seg seg--4">
+        <label class="seg-opt"><input type="radio" name="op" value="auto" checked><span>Auto</span></label>
+        <label class="seg-opt"><input type="radio" name="op" value="add"><span>Add</span></label>
+        <label class="seg-opt"><input type="radio" name="op" value="sub"><span>Take away</span></label>
+        <label class="seg-opt"><input type="radio" name="op" value="both"><span>Both</span></label>
+      </div>
+    </fieldset>
+
+    <div class="opt-row">
+      <label for="opt-speech">Spoken prompts</label>
+      <input id="opt-speech" class="switch" type="checkbox" role="switch" checked>
+    </div>
+
+    <div class="opt-danger">
+      <button id="reset-btn" class="hold-btn" type="button" aria-describedby="reset-note">
+        <span class="hold-fill" aria-hidden="true"></span>
+        <span class="when-idle">Hold to reset progress</span>
+        <span class="when-armed">Hold again to confirm reset</span>
+      </button>
+      <p id="reset-note" class="opt-hint" aria-live="polite">Clears stars, stickers and level on this device.</p>
+    </div>
+  </div>
+</section>
+
+<!-- =================================================================
+     OVERLAYS: confetti layer + level-up moment (never block taps)
+     ================================================================= -->
+<div id="confetti" class="confetti-layer" aria-hidden="true">
+  <svg id="burst" class="burst" viewBox="0 0 200 200" aria-hidden="true">
+    <g fill="#ffc531" stroke="#c27a00" stroke-width="2" stroke-linejoin="round">
+      <path d="M100 58l12 25 27 4-20 19 5 27-24-13-24 13 5-27-20-19 27-4z"/>
+      <path d="M40 40l5 10 11 2-8 8 2 11-10-5-10 5 2-11-8-8 11-2z"/>
+      <path d="M160 36l5 10 11 2-8 8 2 11-10-5-10 5 2-11-8-8 11-2z"/>
+      <path d="M36 140l4 8 9 1-7 6 2 9-8-4-8 4 2-9-7-6 9-1z"/>
+      <path d="M164 140l4 8 9 1-7 6 2 9-8-4-8 4 2-9-7-6 9-1z"/>
+    </g>
+  </svg>
+</div>
+<div id="levelup" class="levelup" aria-hidden="true">
+  <span class="levelup-badge"><span id="levelup-num">3</span></span>
+  <span class="levelup-arrows" aria-hidden="true">
+    <svg class="ico" viewBox="0 0 24 24" style="width:34px;height:34px"><path d="M5 15l7-7 7 7" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </span>
+  <span>Level up!</span>
+</div>
+
+<script>
+/* =====================================================================
+   UI CONTRACT for the game-logic developer
+   (markup + CSS are final; write logic below this comment only)
+   =====================================================================
+
+   GLOBAL
+   - Theme: <html data-theme="fruit|animals|space|sea">. Changes background
+     gradient, pattern, accent colours, tray tints. Set it once per round.
+   - Hidden things use the `hidden` attribute (CSS forces display:none).
+
+   SCREENS (show = el.hidden = false, hide = el.hidden = true)
+   - #screen-play, #screen-round, #screen-book: exactly ONE of these visible.
+   - #screen-parents: modal dialog OVER whatever is showing (leave the
+     current screen visible underneath). When open: move focus to
+     #parents-close-btn, set `inert` on the screen underneath, close on Esc;
+     on close remove `inert` and return focus to #gear-btn.
+   - Each screen fades in by itself when un-hidden (no class needed).
+
+   ELEMENT IDS
+   Play:      #screen-play  (attribute data-mode="count|add|sub")
+              #level-badge (set aria-label "Level N")  #level-num (text)
+              #stars (pill; aria-label "N stars")  #star-count (text)
+              #trail (ol of 5 .dot; aria-label "Question N of 5")
+              #mute-btn (aria-pressed="true" = sound OFF; icon swaps itself)
+              #book-btn  #gear-btn (press-and-hold, see HOLD)
+              #mascot (svg; data-mood)  #say (feedback text, aria-live)
+              #speak-btn (repeat prompt; add .is-speaking while talking)
+              #stage  #group-a  #group-b (trays; put .obj buttons inside)
+              #stage-op (text "+" ; hidden automatically in count/sub mode)
+              #next-btn (hidden attr; show after a final correct answer)
+              #equation (set aria-label to the spoken sentence, e.g.
+                         "3 plus 2 equals what?")
+              #slot-a  #eq-op ("+" or "−" U+2212)  #slot-b  #eq-equals  #slot-r
+                 (in data-mode="count" only #slot-r is shown)
+              #pad (11 static .key buttons, data-n 0..10)
+   Round end: #screen-round (data-gold="true" when all stickers are owned:
+              use 🌟 or ⭐ as the "sticker")  #round-mascot (data-mood)
+              #sticker-reveal  #round-sticker (emoji text + aria-label
+              "New sticker: NAME")  #round-stars (5 .round-q)
+              #round-total (text "+12", aria-label "12 stars this round")
+              #again-btn  #round-book-btn
+   Book:      #screen-book  #book-back-btn  #book-count (text "3 / 24",
+              aria-label "3 of 24 stickers")  #book-grid (24 .sticker)
+   Grown-ups: #screen-parents  #parents-close-btn
+              #opt-level (radios name="start-level" value 1..6)
+              #opt-op    (radios name="op" value auto|add|sub|both)
+              #opt-speech (checkbox switch)
+              #reset-btn (hold button)  #reset-note (aria-live text)
+   Overlays:  #confetti (layer; append pieces here)  #burst (inside it)
+              #levelup  #levelup-num
+
+   SNIPPETS TO GENERATE
+   One object (counting, addition, subtraction all use the same button):
+     <button class="obj" type="button" aria-label="apple"><span class="obj-emoji" aria-hidden="true">🍎</span></button>
+   One number badge (append inside the .obj when it gets .is-counted):
+     <span class="obj-badge" aria-hidden="true">3</span>
+     (update the obj aria-label, e.g. "apple, counted 3")
+   One pad key (already in markup; same shape if you rebuild the pad):
+     <button class="key" type="button" data-n="7" aria-label="7">7</button>
+     (data-n="10" spans two columns automatically)
+   One sticker cell (24 inside #book-grid):
+     <li class="sticker" data-earned="true"><span class="sticker-emoji" role="img" aria-label="Rocket">🚀</span></li>
+     unearned: data-earned="false", aria-label "Not found yet" (the emoji is
+     still rendered, CSS turns it into a grey silhouette).
+     newest sticker: add data-new="true" (gold glow + pop).
+   One progress dot (5 inside #trail):
+     <li class="dot" data-state="todo"></li>
+   One round-end star cell (5 inside #round-stars):
+     <li class="round-q" data-stars="3" aria-label="3 stars"></li>
+   One confetti piece (append ~40 to #confetti; vary the custom props):
+     <i class="confetti" style="--x:37%;--dx:-60px;--rot:620deg;--dur:1.7s;--delay:.08s;--c:#ff5b6e;--w:10px;--h:16px"></i>
+     shape variants: add class "confetti--round" or "confetti--star".
+     --x start position across the screen (0-100%), --dx sideways drift,
+     --rot total spin, --dur fall time (1.4-2.2s), --delay (0-.4s),
+     --c colour, --w/--h size.
+
+   STATE CLASSES AND ATTRIBUTES
+   Objects (.obj):
+     (none)          idle: white tile, gentle breathing loop
+     .is-counted     tinted tile + bounce once; also append .obj-badge
+     .is-gone        taken away: dashed tile, emoji faded, ink strike line.
+                     Can combine with .is-counted (counting the taken-away
+                     ones on L3 step 2). Remove both + badges to re-count.
+     disabled attr   allowed (looks unchanged) when objects are not tappable.
+   Slots (.slot) — data-state, put the digit as textContent ('' if none):
+     pending   dashed, quiet dash shown when empty
+     active    accent border, pulsing, shows "?" when empty
+     filled    solid neutral (given numbers on L4-L6)
+     correct   green + tick badge, pops once
+     hint      worked answer: dashed gold, glowing (put the answer digit in)
+     class .is-wobble   wrong-answer wobble (fade blink under reduced motion)
+   Pad keys (.key):
+     (none)        normal
+     .is-pressed   pressed-down look; add for ~150ms on physical-key presses
+                   (:active already covers taps)
+     .is-dim + disabled attr   wrong for this step (sunken, faded, outlined)
+     .is-hint      glowing gold, the only enabled key in the worked answer
+     disabled attr (alone)     pad paused, e.g. during auto-count
+   #screen-play[data-mode]: count = one tray, only #slot-r;
+                            add   = two trays with "+" between, full sentence;
+                            sub   = one tray (#group-a) holding the whole start
+                                    amount, taken-away ones marked .is-gone.
+   Mascot svg (#mascot, #round-mascot) data-mood:
+     idle (breathe + blink, loops), cheer (3 hops + arms up + open mouth,
+     then holds the pose), think (eyes up, thought dots, tilt, loops),
+     wave (arm waves, loops). Set back to "idle" yourself (~1.5s after cheer).
+   #say: set textContent; optionally add .is-new for a short slide-in
+     (remove + reflow before re-adding).
+   #speak-btn.is-speaking: waves pulse while speechSynthesis talks.
+   #trail .dot data-state: todo | now (pulsing ring) | done (gold star, pops).
+   #stars .is-gain: star count pop when stars are added.
+   #stars .is-sparkle: "3 in a row" sparkle.
+   #next-btn: remove `hidden` to show (pops in, then nudges); set hidden again.
+   #confetti.is-on: add while a celebration runs (shows #burst under
+     reduced motion), remove when cleaning up.
+   #levelup.is-show: level-up moment (set #levelup-num first). Also say it in #say.
+   #screen-round[data-gold="true"]: gold disc for the all-stickers celebration.
+   HOLD (#gear-btn, #reset-btn): add .is-holding on pointerdown (ring / bar
+     fills over --hold-ms = 1000ms, CSS transition), remove on pointerup,
+     pointerleave, pointercancel (ring drains back). Run your own 1000ms timer
+     for the action; do not rely on transitionend. Keyboard: treat a held
+     Enter/Space the same way.
+   #reset-btn[data-armed="true"]: label switches to "Hold again to confirm
+     reset". After a confirmed reset remove data-armed and set #reset-note
+     text (e.g. "Progress cleared."). Disarm after ~5s or when the panel closes.
+
+   ANIMATIONS THAT END ON THEIR OWN (class/attr may stay; to replay, remove
+   it, force reflow (void el.offsetWidth), add again):
+     .obj.is-counted bounce, .obj-badge pop, .is-gone strike draw,
+     .slot[data-state=correct] pop, .slot.is-wobble (remove it after ~500ms
+     or on animationend so the next wrong try can replay),
+     .dot[data-state=done] pop, #stars.is-gain, #stars.is-sparkle,
+     .say.is-new, mascot cheer hops (3 then stops), .confetti pieces (end
+     invisible; remove the nodes after dur+delay, ~2.6s max),
+     #levelup.is-show (2.2s then invisible; remove class before next use),
+     sticker reveal / round stars / screen fade (replay every time the
+     screen is un-hidden).
+   LOOPING (run until you change the state): idle object breathe,
+     .slot active pulse, .slot hint glow, .key.is-hint glow, .dot now ring,
+     mascot idle/think/wave, #next-btn nudge, round-end rays,
+     #speak-btn.is-speaking.
+
+   REDUCED MOTION is handled entirely in CSS; use the same classes.
+
+   SAMPLE STATE in the markup (level 2, "3 + 2", first apple counted,
+   #slot-a active, question 2 of 5, 12 stars) is placeholder: replace the
+   contents of #group-a/#group-b, slots, #say, #trail, counts at startup.
+   ===================================================================== */
+</script>
+</body>
+</html>
